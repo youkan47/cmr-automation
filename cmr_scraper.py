@@ -98,12 +98,13 @@ async def generate_fixtures_graphic():
         logo2 = team_logos.get(t2.upper(), "")
         final_fixtures_with_logos.append((t1, t2, logo1, logo2))
 
-    # --- CHARGEMENT DU MASTER BACKGROUND DE RÉFÉRENCE ---
-    bg_path = "master_bg.png"
+    # --- CHARGEMENT DE VOTRE MASTER BACKGROUND (IMG_0847.jpeg) ---
+    bg_path = "IMG_0847.jpeg"
     if os.path.exists(bg_path):
         img = Image.open(bg_path).convert("RGB")
-        print("✅ master_bg.png chargé avec succès !")
+        print("✅ IMG_0847.jpeg chargé avec succès !")
     else:
+        print("⚠️ IMG_0847.jpeg introuvable, création d'un fond de secours.")
         img = Image.new("RGB", (1080, 1080), color="#050913")
         
     W, H = img.size
@@ -126,13 +127,12 @@ async def generate_fixtures_graphic():
         font_match = ImageFont.load_default()
         font_vs = ImageFont.load_default()
         
-    # Titre "MATCHDAY 1" avec effet doré textuel élégant
+    # Titre "MATCHDAY 1" avec effet d'ombre portée et couleur or brillant
     title_text = "MATCHDAY 1"
-    # Effet d'ombre portée pour le titre
     draw.text((W/2 + 3, 208), title_text, fill="#000000", anchor="mm", font=font_title)
-    draw.text((W/2, 205), title_text, fill="#F3C653", anchor="mm", font=font_title) # Or brillant
+    draw.text((W/2, 205), title_text, fill="#F3C653", anchor="mm", font=font_title)
     
-    # --- INSERTION DES LIGNES DE MATCHS (Style Broadcast Pro) ---
+    # --- INSERTION DES LIGNES DE MATCHS ---
     start_y = 280
     row_height = 138
     
@@ -142,7 +142,7 @@ async def generate_fixtures_graphic():
         # Bandeau de match semi-transparent élégant
         draw.rectangle([75, y, W-75, y + 115], fill=(8, 18, 38, 220), outline=(212, 175, 55, 120), width=1)
         
-        # Ligne lumineuse dorée sous chaque match (effet néon de l'exemple)
+        # Ligne lumineuse dorée sous chaque match
         draw.line([(85, y + 115), (W - 85, y + 115)], fill="#E5B84B", width=2)
         
         if logo1_url and not logo1_url.startswith("http"):
@@ -150,7 +150,7 @@ async def generate_fixtures_graphic():
         if logo2_url and not logo2_url.startswith("http"):
             logo2_url = base_url + logo2_url
 
-        # Insertion Logo Équipe 1 (Circulaires / Redimensionnés à 68x68)
+        # Insertion Logo Équipe 1
         if logo1_url:
             try:
                 response = requests.get(logo1_url, timeout=5)
@@ -170,20 +170,20 @@ async def generate_fixtures_graphic():
             except Exception as e:
                 print(f"Erreur logo 2: {e}")
 
-        # Petit badge "VS" central en cyan néon
+        # Badge "VS" central en cyan néon
         vs_box_w, vs_box_h = 56, 36
         vs_x = W // 2 - vs_box_w // 2
         vs_y = y + 40
         draw.rectangle([vs_x, vs_y, vs_x + vs_box_w, vs_y + vs_box_h], fill="#03060A", outline="#00B4DB", width=2)
         draw.text((W/2, y + 58), "VS", fill="#00B4DB", anchor="mm", font=font_vs)
 
-        # Noms des équipes bien lisibles en blanc
+        # Noms des équipes
         draw.text((195, y + 58), team_a.upper()[:13], fill="#FFFFFF", anchor="lm", font=font_match)
         draw.text((W - 195, y + 58), team_b.upper()[:13], fill="#FFFFFF", anchor="rm", font=font_match)
         
     output_path = "instagram_post.png"
     img.save(output_path)
-    print(f"🎨 Affiche style broadcast générée avec succès : {output_path}")
+    print(f"🎨 Affiche broadcast générée avec succès à partir de IMG_0847.jpeg : {output_path}")
 
 if __name__ == "__main__":
     asyncio.run(generate_fixtures_graphic())
