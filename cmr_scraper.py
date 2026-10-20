@@ -19,21 +19,18 @@ async def generate_fixtures_graphic():
         await page.goto(url, wait_until="domcontentloaded", timeout=60000)
         await asyncio.sleep(5)
         
-        # Extraction ultra-précise par carte de match individuelle
-        extracted_fixtures = await page.evaluate(f"""(roundNum) => {{
+        # Extraction ultra-précise par carte de match individuelle (corrigée sans f-string)
+        extracted_fixtures = await page.evaluate("""(roundNum) => {
             const fixtures = [];
             const targetText = 'League · Round ' + roundNum;
             
-            // On cherche tous les blocs/cartes de la page
             const cards = document.querySelectorAll('div');
             
-            cards.forEach(card => {{
+            cards.forEach(card => {
                 const text = card.innerText;
-                // On s'assure que la carte contient bien le texte du round ET au moins 2 images (les logos des 2 équipes)
                 const imgs = card.querySelectorAll('img');
                 
-                if (text && text.includes(targetText) && imgs.length >= 2) {{
-                    // On extrait les lignes de texte propres à cette carte spécifique
+                if (text && text.includes(targetText) && imgs.length >= 2) {
                     const lines = text.split('\\n').map(l => l.trim()).filter(l => l.length > 0);
                     const cleaned = [];
                     const skipWords = ['2 legs', 'scheduled', '0/2 played', 'tue', 'oct', 'nov', '2026', 'crest', 'today', 'matches', 'played', 'league', 'round', String(roundNum)];
@@ -45,27 +42,25 @@ async def generate_fixtures_graphic():
                         }
                     }
                     
-                    if (cleaned.length >= 2) {{
+                    if (cleaned.length >= 2) {
                         const t1 = cleaned[0];
                         const t2 = cleaned[1];
                         
                         let logo1 = imgs[0] ? imgs[0].src : '';
                         let logo2 = imgs[1] ? imgs[1].src : '';
                         
-                        // S'assurer qu'on n'ajoute pas de doublons et que ce sont de vraies équipes
-                        if (!fixtures.some(f => f[0] === t1 && f[1] === t2) && t1 !== t2) {{
+                        if (!fixtures.some(f => f[0] === t1 && f[1] === t2) && t1 !== t2) {
                             fixtures.push([t1, t2, logo1, logo2]);
-                        }}
-                    }}
-                }}
-            }});
+                        }
+                    }
+                }
+            });
             return fixtures;
-        }}""", round_number)
+        }""", round_number)
 
         print(f"🔍 Nombre de vraies cartes de matchs extraites : {len(extracted_fixtures)}")
         await browser.close()
 
-    # Sécurité si l'extraction échoue
     if not extracted_fixtures or len(extracted_fixtures) == 0:
         print(f"⚠️ Utilisation des données de secours pour le Round {round_number}.")
         extracted_fixtures = [
@@ -78,7 +73,7 @@ async def generate_fixtures_graphic():
 
     fixtures_to_render = extracted_fixtures[:5]
 
-    # --- ÉTAPE DE VÉRIFICATION DÉTAILLÉE DANS LES LOGS ---
+    # --- VÉRIFICATION DÉTAILLÉE DANS LES LOGS ---
     print("\n" + "="*50)
     print(f"📋 VÉRIFICATION FINALE DES MATCHS ET LOGOS (ROUND {round_number}) :")
     print("="*50)
@@ -111,19 +106,18 @@ async def generate_fixtures_graphic():
     start_y = 230
     row_height = 190
     
+    base_url = "https://zone212.cmrankings.com"
+    
     for i, (team_a, team_b, logo1_url, logo2_url) in enumerate(fixtures_to_render):
         y = start_y + (i * row_height)
         
         draw.rectangle([80, y, W-80, y + 160], fill="#0d1930", outline="#d4af37", width=2)
         
-        # Normalisation des URLs relatives si besoin
-        base_url = "https://zone212.cmrankings.com"
         if logo1_url and not logo1_url.startswith("http"):
             logo1_url = base_url + logo1_url
         if logo2_url and not logo2_url.startswith("http"):
             logo2_url = base_url + logo2_url
 
-        # Téléchargement et collage du Logo 1
         if logo1_url:
             try:
                 response = requests.get(logo1_url, timeout=5)
@@ -133,7 +127,6 @@ async def generate_fixtures_graphic():
             except Exception as e:
                 print(f"Erreur logo 1: {e}")
                 
-        # Téléchargement et collage du Logo 2
         if logo2_url:
             try:
                 response = requests.get(logo2_url, timeout=5)
@@ -143,7 +136,6 @@ async def generate_fixtures_graphic():
             except Exception as e:
                 print(f"Erreur logo 2: {e}")
 
-        # Noms des équipes & Séparateur VS
         draw.text((210, y + 80), team_a.upper()[:15], fill="#ffffff", anchor="lm", font=font_match)
         draw.text((W/2, y + 80), "VS", fill="#00b4db", anchor="mm", font=font_match)
         draw.text((W - 210, y + 80), team_b.upper()[:15], fill="#ffffff", anchor="rm", font=font_match)
