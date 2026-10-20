@@ -6,12 +6,9 @@ import requests
 from io import BytesIO
 
 async def generate_fixtures_graphic():
-    # --- CONFIGURATION : CHANGE LE NUMÉRO DU ROUND ICI ---
     round_number = 1 
-    # ----------------------------------------------------
-    
-    url = "https://zone212.cmrankings.com/competition/21?tab=fixtures"
-    print(f"🚀 Connexion ciblée sur les matchs (Recherche du Round {round_number}) : {url}")
+    url = f"https://zone212.cmrankings.com/competition/21?tab=fixtures"
+    print(f"🚀 [Playwright] Connexion ciblée sur le Round {round_number} : {url}")
     
     extracted_fixtures = []
     
@@ -19,49 +16,60 @@ async def generate_fixtures_graphic():
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
         
+        # Navigation et attente du chargement réseau complet
         await page.goto(url, wait_until="domcontentloaded", timeout=60000)
         await asyncio.sleep(5)
         
-        extracted_fixtures = await page.evaluate("""(roundNum) => {
-            const fixtures = [];
-            const targetText = 'League · Round ' + roundNum;
-            
-            const divs = document.querySelectorAll('div');
-            divs.forEach(card => {
-                const text = card.innerText;
-                if (text && text.includes(targetText) && (text.includes('SCHEDULED') || text.includes('0/2 played'))) {
-                    const lines = text.split('\\n').map(l => l.trim()).filter(l => l.length > 0);
-                    const cleaned = [];
-                    const skipWords = ['2 legs', 'scheduled', '0/2 played', 'tue', 'oct', 'nov', '2026', 'crest', 'today', 'matches', 'played', 'league', 'round', String(roundNum)];
+        # Utilisation des locators Playwright pour cibler les conteneurs de matchs
+        # On recherche les éléments contenant la mention du round
+        target_text = f"League · Round {round_number}"
+        
+        # Récupération de tous les blocs de texte / cartes via Playwright
+        cards = await page.locator("div").all()
+        
+        for card in cards:
+            try:
+                text = await card.inner_text()
+                if text and target_text in text and ("SCHEDULED" in text or "0/2 played" in text):
+                    # Extraire les lignes propres du bloc
+                    lines = [l.strip() for l in text.split("\n") if l.strip()]
+                    cleaned = []
+                    skip_words = ['2 legs', 'scheduled', '0/2 played', 'tue', 'oct', 'nov', '2026', 'crest', 'today', 'matches', 'played', 'league', 'round', str(round_number)]
                     
-                    for (let l of lines) {
-                        const lower = l.toLowerCase();
-                        if (!skipWords.some(w => lower.includes(w)) && l.length > 2 && l.length < 30) {
-                            cleaned.push(l);
-                        }
-                    }
+                    for l in lines:
+                        lower = l.lower()
+                        if not any(w in lower for w in skip_words) and 2 < len(l) < 30:
+                            cleaned.append(l)
                     
-                    if (cleaned.length >= 2) {
-                        const t1 = cleaned[0];
-                        const t2 = cleaned[1];
+                    if len(cleaned) >= 2:
+                        t1 = cleaned[0]
+                        t2 = cleaned[1]
                         
-                        const imgs = card.querySelectorAll('img');
-                        let logo1 = imgs.length > 0 ? imgs[0].src : '';
-                        let logo2 = imgs.length > 1 ? imgs[1].src : '';
+                        # Extraction robuste des URLs des logos via le locator Playwright
+                        img_locators = card.locator("img")
+                        img_count = await img_locators.count()
                         
-                        if (!fixtures.some(f => f[0] === t1 && f[1] === t2) && t1 !== t2) {
-                            fixtures.push([t1, t2, logo1, logo2]);
-                        }
-                    }
-                }
-            });
-            return fixtures;
-        }""", round_number)
+                        logo1 = await img_locators.nth(0).get_attribute("src") if img_count > 0 else ""
+                        logo2 = await img_locators.nth(1).get_attribute("src") if img_count > 1 else ""
+                        
+                        # Si les URLs sont relatives, on les complète avec le domaine de base
+                        base_url = "https://zone212.cmrankings.com"
+                        if logo1 and not logo1.startswith("http"):
+                            logo1 = base_url + logo1
+                        if logo2 and not logo2.startswith("http"):
+                            logo2 = base_url + logo2
+                            
+                        match_tuple = (t1, t2, logo1, logo2)
+                        if match_tuple not in extracted_fixtures and t1 != t2:
+                            extracted_fixtures.append(match_tuple)
+            except Exception as e:
+                continue
 
-        print(f"🔍 Nombre de duos extraits : {len(extracted_fixtures)}")
+        print(f"🔍 Nombre de duos extraits via Playwright : {len(extracted_fixtures)}")
         await browser.close()
 
-    if not extracted_fixtures or len(extracted_fixtures) < 5:
+    # Sécurité si l'extraction échoue
+    if not extracted_fixtures or len(extracted_fixtures) == 0:
         print(f"⚠️ Utilisation des données de secours pour le Round {round_number}.")
         extracted_fixtures = [
             ("Viltrumites ES", "BLUE LOCK1", "", ""),
@@ -73,14 +81,14 @@ async def generate_fixtures_graphic():
 
     fixtures_to_render = extracted_fixtures[:5]
 
-    # --- ÉTAPE DE VÉRIFICATION DÉTAILLÉE DANS LES LOGS (ÉQUIPES + LOGOS) ---
+    # --- VÉRIFICATION DÉTAILLÉE DANS LES LOGS ---
     print("\n" + "="*50)
-    print(f"📋 VÉRIFICATION DES MATCHS ET URLS DES LOGS (ROUND {round_number}) :")
+    print(f"📋 VÉRIFICATION PLAYWRIGHT (ROUND {round_number}) :")
     print("="*50)
     for idx, match in enumerate(fixtures_to_render, 1):
         print(f"Match {idx} :")
-        print(f"  - Équipe 1 : {match[0]} | Logo : {match[2] if match[2] else '❌ AUCUN URL TROUVÉ'}")
-        print(f"  - Équipe 2 : {match[1]} | Logo : {match[3] if match[3] else '❌ AUCUN URL TROUVÉ'}")
+        print(f"  - Équipe 1 : {match[0]} | Logo : {match[2] if match[2] else '❌ URL INTrouvable'}")
+        print(f"  - Équipe 2 : {match[1]} | Logo : {match[3] if match[3] else '❌ URL INTrouvable'}")
     print("="*50 + "\n")
 
     # --- CRÉATION DE L'AFFICHE INSTAGRAM (1080x1350) ---
@@ -101,7 +109,7 @@ async def generate_fixtures_graphic():
         font_match = ImageFont.load_default()
         
     draw.text((W/2, 110), "PROGRAMME DU JOUR", fill="#d4af37", anchor="mm", font=font_title)
-    draw.text((W/2, 175), f"LIGUE • ROUND {round_number} (5 MATCHS)", fill="#00b4db", anchor="mm", font=font_sub)
+    draw.text((W/2, 175), f"LIGUE • ROUND {round_number} ({len(fixtures_to_render)} MATCHS)", fill="#00b4db", anchor="mm", font=font_sub)
     
     start_y = 230
     row_height = 190
@@ -111,6 +119,7 @@ async def generate_fixtures_graphic():
         
         draw.rectangle([80, y, W-80, y + 160], fill="#0d1930", outline="#d4af37", width=2)
         
+        # Téléchargement et collage du Logo 1
         if logo1_url:
             try:
                 response = requests.get(logo1_url, timeout=5)
@@ -118,8 +127,9 @@ async def generate_fixtures_graphic():
                 logo_img = logo_img.resize((80, 80), Image.Resampling.LANCZOS)
                 img.paste(logo_img, (110, y + 40), logo_img)
             except Exception as e:
-                print(f"Erreur téléchargement logo 1 ({logo1_url}): {e}")
+                print(f"Erreur image logo 1: {e}")
                 
+        # Téléchargement et collage du Logo 2
         if logo2_url:
             try:
                 response = requests.get(logo2_url, timeout=5)
@@ -127,7 +137,7 @@ async def generate_fixtures_graphic():
                 logo_img = logo_img.resize((80, 80), Image.Resampling.LANCZOS)
                 img.paste(logo_img, (W - 190, y + 40), logo_img)
             except Exception as e:
-                print(f"Erreur téléchargement logo 2 ({logo2_url}): {e}")
+                print(f"Erreur image logo 2: {e}")
 
         draw.text((210, y + 80), team_a.upper()[:15], fill="#ffffff", anchor="lm", font=font_match)
         draw.text((W/2, y + 80), "VS", fill="#00b4db", anchor="mm", font=font_match)
@@ -135,7 +145,7 @@ async def generate_fixtures_graphic():
         
     output_path = "instagram_post.png"
     img.save(output_path)
-    print(f"🎨 Affiche avec logos du Round {round_number} générée avec succès : {output_path}")
+    print(f"🎨 Affiche avec logos Playwright générée avec succès : {output_path}")
 
 if __name__ == "__main__":
     asyncio.run(generate_fixtures_graphic())
