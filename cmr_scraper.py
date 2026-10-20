@@ -7,32 +7,60 @@ from io import BytesIO
 
 async def generate_fixtures_graphic():
     round_number = 1 
-    url = f"https://zone212.cmrankings.com/competition/21?tab=fixtures"
-    print(f"🚀 [Chirurgical V3] Extraction ciblée du Round {round_number} : {url}")
+    base_url = "https://zone212.cmrankings.com"
     
+    standings_url = f"{base_url}/competition/21?tab=standings"
+    fixtures_url = f"{base_url}/competition/21?tab=fixtures"
+    
+    print(f"🚀 [Stratégie Standings] Connexion au classement pour récupérer les logos...")
+    
+    team_logos = {}
     extracted_fixtures = []
     
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
         
-        await page.goto(url, wait_until="domcontentloaded", timeout=60000)
-        await asyncio.sleep(5)
+        # --- ÉTAPE 1 : Récupérer les logos depuis l'onglet STANDINGS ---
+        await page.goto(standings_url, wait_until="domcontentloaded", timeout=60000)
+        await asyncio.sleep(4)
         
-        # Extraction basée sur les cartes individuelles contenant "League · Round 1"
+        team_logos = await page.evaluate("""() => {
+            const logosMap = {};
+            // On cherche toutes les lignes du tableau de classement
+            const rows = document.querySelectorAll('tr, tbody tr');
+            rows.forEach(row => {
+                const text = row.innerText;
+                const img = row.querySelector('img');
+                if (text && img) {
+                    const lines = text.split('\\n').map(l => l.trim()).filter(l => l.length > 0);
+                    // Le nom de l'équipe est généralement l'élément textuel propre de la ligne
+                    for (let l of lines) {
+                        if (l.length > 2 && l.length < 30 && !/^[0-9]+$/.test(l)) {
+                            logosMap[l.toUpperCase()] = img.src;
+                            break;
+                        }
+                    }
+                }
+            });
+            return logosMap;
+        }""")
+        
+        print(f"✅ Logos récupérés pour {len(team_logos)} équipes depuis le classement.")
+
+        # --- ÉTAPE 2 : Récupérer les matchs du Round depuis l'onglet FIXTURES ---
+        print(f"🚀 Connexion aux matchs du Round {round_number}...")
+        await page.goto(fixtures_url, wait_until="domcontentloaded", timeout=60000)
+        await asyncio.sleep(4)
+        
         extracted_fixtures = await page.evaluate("""(roundNum) => {
             const fixtures = [];
             const targetText = 'League · Round ' + roundNum;
+            const cards = document.querySelectorAll('div');
             
-            // On cible les blocs de cartes de la page
-            const divs = document.querySelectorAll('div');
-            
-            divs.forEach(card => {
+            cards.forEach(card => {
                 const text = card.innerText;
-                const imgs = card.querySelectorAll('img');
-                
-                // Si la carte contient le texte du round et exactement ou au moins 2 images de logos
-                if (text && text.includes(targetText) && imgs.length >= 2 && text.includes('0/2 played')) {
+                if (text && text.includes(targetText) && (text.includes('SCHEDULED') || text.includes('0/2 played'))) {
                     const lines = text.split('\\n').map(l => l.trim()).filter(l => l.length > 0);
                     const cleaned = [];
                     const skipWords = ['2 legs', 'scheduled', '0/2 played', 'tue', 'oct', 'nov', '2026', 'crest', 'today', 'matches', 'played', 'league', 'round', String(roundNum), 'active'];
@@ -47,12 +75,8 @@ async def generate_fixtures_graphic():
                     if (cleaned.length >= 2) {
                         const t1 = cleaned[0];
                         const t2 = cleaned[1];
-                        
-                        let logo1 = imgs[0] ? imgs[0].src : '';
-                        let logo2 = imgs[1] ? imgs[1].src : '';
-                        
                         if (!fixtures.some(f => f[0] === t1 && f[1] === t2) && t1 !== t2) {
-                            fixtures.push([t1, t2, logo1, logo2]);
+                            fixtures.push([t1, t2]);
                         }
                     }
                 }
@@ -60,30 +84,36 @@ async def generate_fixtures_graphic():
             return fixtures;
         }""", round_number)
 
-        print(f"🔍 Nombre de vraies cartes de matchs extraites : {len(extracted_fixtures)}")
         await browser.close()
 
-    # Si le scraping dynamique ne trouve pas les 5 matchs exacts, on injecte tes 5 vrais duos officiels avec une sécurité pour les logos
+    # Si l'extraction automatique des fixtures bloque, on injecte tes 5 vrais matchs officiels
     if not extracted_fixtures or len(extracted_fixtures) < 5:
-        print(f"⚠️ Utilisation de la liste officielle des 5 matchs du Round 1.")
+        print("⚠️ Utilisation de la liste officielle des 5 matchs du Round 1.")
         extracted_fixtures = [
-            ("Viltrumites ES", "BLUE LOCK1", "https://zone212.cmrankings.com/tenancy/assets/clubs/logos/club-50-aa9ce95f-c10a-498e-b05f-08bb0c755587.webp", "https://zone212.cmrankings.com/tenancy/assets/clubs/logos/club-50-aa9ce95f-c10a-498e-b05f-08bb0c755587.webp"),
-            ("VNM Esports", "AUREUS ES", "https://zone212.cmrankings.com/tenancy/assets/clubs/logos/club-2-0930e663-24da-4d07-a910-f712671199b3.webp", "https://zone212.cmrankings.com/tenancy/assets/clubs/logos/club-2-0930e663-24da-4d07-a910-f712671199b3.webp"),
-            ("INFIRNO FC", "AJAX CASABLANCA", "", ""),
-            ("TEMARA FC", "FC L HOKOMA", "", ""),
-            ("LMRARCCA", "fc energy", "", "")
+            ("Viltrumites ES", "BLUE LOCK1"),
+            ("VNM Esports", "AUREUS ES"),
+            ("INFIRNO FC", "AJAX CASABLANCA"),
+            ("TEMARA FC", "FC L HOKOMA"),
+            ("LMRARCCA", "fc energy")
         ]
 
     fixtures_to_render = extracted_fixtures[:5]
 
+    # Associer chaque équipe à son logo extrait du dictionnaire "standings"
+    final_fixtures_with_logos = []
+    for t1, t2 in fixtures_to_render:
+        logo1 = team_logos.get(t1.toUpperCase(), "")
+        logo2 = team_logos.get(t2.toUpperCase(), "")
+        final_fixtures_with_logos.append((t1, t2, logo1, logo2))
+
     # --- VÉRIFICATION DÉTAILLÉE DANS LES LOGS ---
     print("\n" + "="*50)
-    print(f"📋 VÉRIFICATION FINALE DES MATCHS ET LOGOS (ROUND {round_number}) :")
+    print(f"📋 VÉRIFICATION FINALE (MATCHS + LOGOS VIA STANDINGS) :")
     print("="*50)
-    for idx, match in enumerate(fixtures_to_render, 1):
+    for idx, match in enumerate(final_fixtures_with_logos, 1):
         print(f"Match {idx} :")
-        print(f"  - Équipe 1 : {match[0]} | Logo : {match[2] if match[2] else '❌ AUCUN URL'}")
-        print(f"  - Équipe 2 : {match[1]} | Logo : {match[3] if match[3] else '❌ AUCUN URL'}")
+        print(f"  - Équipe 1 : {match[0]} | Logo : {match[2] if match[2] else '❌ NON TROUVÉ DANS STANDINGS'}")
+        print(f"  - Équipe 2 : {match[1]} | Logo : {match[3] if match[3] else '❌ NON TROUVÉ DANS STANDINGS'}")
     print("="*50 + "\n")
 
     # --- CRÉATION DE L'AFFICHE INSTAGRAM (1080x1350) ---
@@ -104,13 +134,12 @@ async def generate_fixtures_graphic():
         font_match = ImageFont.load_default()
         
     draw.text((W/2, 110), "PROGRAMME DU JOUR", fill="#d4af37", anchor="mm", font=font_title)
-    draw.text((W/2, 175), f"LIGUE • ROUND {round_number} ({len(fixtures_to_render)} MATCHS)", fill="#00b4db", anchor="mm", font=font_sub)
+    draw.text((W/2, 175), f"LIGUE • ROUND {round_number} ({len(final_fixtures_with_logos)} MATCHS)", fill="#00b4db", anchor="mm", font=font_sub)
     
     start_y = 230
     row_height = 190
-    base_url = "https://zone212.cmrankings.com"
     
-    for i, (team_a, team_b, logo1_url, logo2_url) in enumerate(fixtures_to_render):
+    for i, (team_a, team_b, logo1_url, logo2_url) in enumerate(final_fixtures_with_logos):
         y = start_y + (i * row_height)
         
         draw.rectangle([80, y, W-80, y + 160], fill="#0d1930", outline="#d4af37", width=2)
@@ -144,7 +173,7 @@ async def generate_fixtures_graphic():
         
     output_path = "instagram_post.png"
     img.save(output_path)
-    print(f"🎨 Affiche parfaite générée avec succès : {output_path}")
+    print(f"🎨 Affiche parfaite avec logos du classement générée avec succès : {output_path}")
 
 if __name__ == "__main__":
     asyncio.run(generate_fixtures_graphic())
