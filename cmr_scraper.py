@@ -12,7 +12,7 @@ async def generate_fixtures_graphic():
     standings_url = f"{base_url}/competition/21?tab=standings"
     fixtures_url = f"{base_url}/competition/21?tab=fixtures"
     
-    print(f"🚀 [Pro Layout Dynamic] Récupération des logos et des matchs...")
+    print(f"🚀 [Pro Layout Fix] Récupération des logos et des matchs...")
     
     team_logos = {}
     extracted_fixtures = []
@@ -118,7 +118,6 @@ async def generate_fixtures_graphic():
         with open(font_path, "wb") as f:
             f.write(r.content)
 
-    # Adaptation dynamique des tailles de polices selon la résolution réelle de l'image
     scale = W / 1080.0
     try:
         font_title = ImageFont.truetype(font_path, int(64 * scale))
@@ -129,21 +128,21 @@ async def generate_fixtures_graphic():
         font_match = ImageFont.load_default()
         font_vs = ImageFont.load_default()
         
-    # Titre "MATCHDAY 1" positionné dynamiquement sous le logo du background
+    # Titre "MATCHDAY 1"
     title_text = "MATCHDAY 1"
-    title_y = int(H * 0.23) # Position à 23% de la hauteur totale
+    title_y = int(H * 0.23)
     draw.text((W/2 + int(3*scale), title_y + int(3*scale)), title_text, fill="#000000", anchor="mm", font=font_title)
     draw.text((W/2, title_y), title_text, fill="#F3C653", anchor="mm", font=font_title)
     
-    # --- INSERTION DES LIGNES DE MATCHS PROPORTIONNELLES ---
-    start_y = int(H * 0.31) # Commence juste après le titre
+    # --- INSERTION DES LIGNES DE MATCHS (Correction de la boucle sur final_fixtures_with_logos) ---
+    start_y = int(H * 0.31)
     available_height = H * 0.62
     row_height = int(available_height / 5)
     bar_height = int(row_height * 0.82)
     
     margin_x = int(W * 0.07)
     
-    for i, (team_a, team_b, logo1_url, logo2_url) in enumerate(fixtures_to_render):
+    for i, (team_a, team_b, logo1_url, logo2_url) in enumerate(final_fixtures_with_logos):
         y = start_y + (i * row_height)
         
         # Bandeau de match semi-transparent
