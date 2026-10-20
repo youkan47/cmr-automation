@@ -12,7 +12,7 @@ async def generate_fixtures_graphic():
     standings_url = f"{base_url}/competition/21?tab=standings"
     fixtures_url = f"{base_url}/competition/21?tab=fixtures"
     
-    print(f"🚀 [Pro Layout Fix] Récupération des logos et des matchs...")
+    print(f"🚀 [Pro Layout Dynamic] Récupération des logos et des matchs...")
     
     team_logos = {}
     extracted_fixtures = []
@@ -104,13 +104,13 @@ async def generate_fixtures_graphic():
         img = Image.open(bg_path).convert("RGB")
         print("✅ IMG_0847.jpeg chargé avec succès !")
     else:
-        print("⚠️ IMG_0847.jpeg introuvable, création d'un fond de secours.")
+        print("⚠️ IMG_0847.jpeg introuvable, création d'un fond de secours 1080x1080.")
         img = Image.new("RGB", (1080, 1080), color="#050913")
         
     W, H = img.size
     draw = ImageDraw.Draw(img)
 
-    # Téléchargement d'une police bold propre pour le rendu Linux
+    # Téléchargement de la police
     font_path = "BroadcastFont.ttf"
     if not os.path.exists(font_path):
         ttf_url = "https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Bold.ttf"
@@ -118,45 +118,55 @@ async def generate_fixtures_graphic():
         with open(font_path, "wb") as f:
             f.write(r.content)
 
+    # Adaptation dynamique des tailles de polices selon la résolution réelle de l'image
+    scale = W / 1080.0
     try:
-        font_title = ImageFont.truetype(font_path, 58)  # Titre bien proportionné sous le logo
-        font_match = ImageFont.truetype(font_path, 30)  # Noms d'équipes lisibles
-        font_vs = ImageFont.truetype(font_path, 24)     # VS central
+        font_title = ImageFont.truetype(font_path, int(64 * scale))
+        font_match = ImageFont.truetype(font_path, int(34 * scale))
+        font_vs = ImageFont.truetype(font_path, int(26 * scale))
     except:
         font_title = ImageFont.load_default()
         font_match = ImageFont.load_default()
         font_vs = ImageFont.load_default()
         
-    # Titre "MATCHDAY 1" centré sous le logo CMR de l'image de fond
+    # Titre "MATCHDAY 1" positionné dynamiquement sous le logo du background
     title_text = "MATCHDAY 1"
-    draw.text((W/2 + 2, 192), title_text, fill="#000000", anchor="mm", font=font_title)
-    draw.text((W/2, 190), title_text, fill="#F3C653", anchor="mm", font=font_title) # Or brillant
+    title_y = int(H * 0.23) # Position à 23% de la hauteur totale
+    draw.text((W/2 + int(3*scale), title_y + int(3*scale)), title_text, fill="#000000", anchor="mm", font=font_title)
+    draw.text((W/2, title_y), title_text, fill="#F3C653", anchor="mm", font=font_title)
     
-    # --- INSERTION DES LIGNES DE MATCHS (Positionnement parfait) ---
-    start_y = 260
-    row_height = 115
+    # --- INSERTION DES LIGNES DE MATCHS PROPORTIONNELLES ---
+    start_y = int(H * 0.31) # Commence juste après le titre
+    available_height = H * 0.62
+    row_height = int(available_height / 5)
+    bar_height = int(row_height * 0.82)
     
-    for i, (team_a, team_b, logo1_url, logo2_url) in enumerate(final_fixtures_with_logos):
+    margin_x = int(W * 0.07)
+    
+    for i, (team_a, team_b, logo1_url, logo2_url) in enumerate(fixtures_to_render):
         y = start_y + (i * row_height)
         
-        # Bandeau de match semi-transparent élégant (largeur bien ajustée aux marges)
-        draw.rectangle([85, y, W-85, y + 98], fill=(8, 18, 38, 230), outline=(212, 175, 55, 140), width=1)
+        # Bandeau de match semi-transparent
+        draw.rectangle([margin_x, y, W - margin_x, y + bar_height], fill=(8, 18, 38, 230), outline=(212, 175, 55, 140), width=max(1, int(scale)))
         
         # Ligne lumineuse dorée sous chaque match
-        draw.line([(95, y + 98), (W - 95, y + 98)], fill="#E5B84B", width=2)
+        draw.line([(margin_x + int(10*scale), y + bar_height), (W - margin_x - int(10*scale), y + bar_height)], fill="#E5B84B", width=max(2, int(2*scale)))
         
         if logo1_url and not logo1_url.startswith("http"):
             logo1_url = base_url + logo1_url
         if logo2_url and not logo2_url.startswith("http"):
             logo2_url = base_url + logo2_url
 
-        # Insertion Logo Équipe 1 (Taille optimisée : 56x56)
+        logo_size = int(bar_height * 0.7)
+        logo_y = y + (bar_height - logo_size) // 2
+
+        # Insertion Logo Équipe 1
         if logo1_url:
             try:
                 response = requests.get(logo1_url, timeout=5)
                 logo_img = Image.open(BytesIO(response.content)).convert("RGBA")
-                logo_img = logo_img.resize((56, 56), Image.Resampling.LANCZOS)
-                img.paste(logo_img, (115, y + 21), logo_img)
+                logo_img = logo_img.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
+                img.paste(logo_img, (margin_x + int(25*scale), logo_y), logo_img)
             except Exception as e:
                 print(f"Erreur logo 1: {e}")
                 
@@ -165,25 +175,26 @@ async def generate_fixtures_graphic():
             try:
                 response = requests.get(logo2_url, timeout=5)
                 logo_img = Image.open(BytesIO(response.content)).convert("RGBA")
-                logo_img = logo_img.resize((56, 56), Image.Resampling.LANCZOS)
-                img.paste(logo_img, (W - 171, y + 21), logo_img)
+                logo_img = logo_img.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
+                img.paste(logo_img, (W - margin_x - int(25*scale) - logo_size, logo_y), logo_img)
             except Exception as e:
                 print(f"Erreur logo 2: {e}")
 
         # Badge "VS" central en cyan néon
-        vs_box_w, vs_box_h = 46, 30
-        vs_x = W // 2 - vs_box_w // 2
-        vs_y = y + 34
-        draw.rectangle([vs_x, vs_y, vs_x + vs_box_w, vs_y + vs_box_h], fill="#03060A", outline="#00B4DB", width=2)
-        draw.text((W/2, y + 49), "VS", fill="#00B4DB", anchor="mm", font=font_vs)
+        vs_w, vs_h = int(52 * scale), int(32 * scale)
+        vs_x = W // 2 - vs_w // 2
+        vs_y = y + (bar_height - vs_h) // 2
+        draw.rectangle([vs_x, vs_y, vs_x + vs_w, vs_y + vs_h], fill="#03060A", outline="#00B4DB", width=max(1, int(scale)))
+        draw.text((W/2, y + bar_height/2), "VS", fill="#00B4DB", anchor="mm", font=font_vs)
 
-        # Noms des équipes parfaitement alignés
-        draw.text((190, y + 49), team_a.upper()[:14], fill="#FFFFFF", anchor="lm", font=font_match)
-        draw.text((W - 190, y + 49), team_b.upper()[:14], fill="#FFFFFF", anchor="rm", font=font_match)
+        # Noms des équipes
+        text_y = y + bar_height / 2
+        draw.text((margin_x + int(105*scale), text_y), team_a.upper()[:14], fill="#FFFFFF", anchor="lm", font=font_match)
+        draw.text((W - margin_x - int(105*scale), text_y), team_b.upper()[:14], fill="#FFFFFF", anchor="rm", font=font_match)
         
     output_path = "instagram_post.png"
     img.save(output_path)
-    print(f"🎨 Affiche corrigée et alignée générée avec succès : {output_path}")
+    print(f"🎨 Affiche dynamique et proportionnelle générée avec succès : {output_path}")
 
 if __name__ == "__main__":
     asyncio.run(generate_fixtures_graphic())
