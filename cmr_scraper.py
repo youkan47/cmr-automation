@@ -14,33 +14,45 @@ async def generate_fixtures_graphic():
         await page.goto(url, wait_until="domcontentloaded", timeout=60000)
         await asyncio.sleep(5)
         
-        # On cherche à isoler spécifiquement le Round 1 / Tour 1 en analysant les blocs de texte de la page
-        elements = await page.locator("div, section, article, tr").all()
-        fixtures_data = []
-        seen_matches = set()
+        # Récupération de tous les éléments textuels potentiels des matchs
+        elements = await page.locator("div, li, tr, span").all()
+        raw_fixtures = []
+        seen = set()
         
-        target_found = False
+        # Mots-clés à ignorer absolument (règles, dates, statuts)
+        ignored_words = ["active", "oct", "nov", "2026", "شروط", "القوانين", "الجوائز", "توقيت", "مباريات", "أسبوعياً", "Credit", "DH"]
+
         for el in elements:
             try:
                 text = await el.inner_text()
-                # On cherche un bloc qui mentionne le tour 1 ou round 1
-                if "round 1" in text.lower() or "tour 1" in text.lower():
-                    target_found = True
-                
                 lines = [l.strip() for l in text.split("\n") if l.strip()]
+                
                 for i in range(len(lines) - 1):
-                    line_lower = lines[i].lower()
-                    if "vs" in line_lower or "-" in lines[i+1]:
-                        match_str = f"{lines[i]} vs {lines[i+1]}"
-                        if match_str not in seen_matches and len(lines[i]) > 2 and len(lines[i+1]) > 2:
-                            if "classement" not in line_lower and "fixtures" not in line_lower:
-                                seen_matches.add(match_str)
-                                fixtures_data.append((lines[i], lines[i+1]))
+                    line1 = lines[i]
+                    line2 = lines[i+1]
+                    
+                    # Filtres de validation stricts :
+                    # - Les noms d'équipes font généralement entre 3 et 30 caractères
+                    # - Ne doivent pas contenir de mots-clés parasites
+                    # - Doivent être sur une structure de confrontation
+                    if 2 < len(line1) < 30 and 2 < len(line2) < 30:
+                        l1_lower = line1.lower()
+                        l2_lower = line2.lower()
+                        
+                        if any(w in l1_lower or w in l2_lower for w in ignored_words):
+                            continue
+                            
+                        match_key = f"{line1} vs {line2}"
+                        if match_key not in seen and line1 != line2:
+                            seen.add(match_key)
+                            raw_fixtures.append((line1, line2))
             except:
                 continue
 
-        # Si le filtrage automatique par texte échoue ou remonte trop de rounds, 
-        # on s'assure d'avoir les matchs du Round 1 configurés proprement
+        # Nettoyage et sélection des vrais matchs du Round 1
+        fixtures_data = raw_fixtures[:4] # On garde les 4 premiers duos valides trouvés
+
+        # Si le filtrage automatique ne trouve rien, on met les vrais matchs de base pour que l'affiche sorte bien
         if len(fixtures_data) == 0:
             fixtures_data = [
                 ("LaBombaTchi", "Makhzen Fc"),
@@ -50,9 +62,9 @@ async def generate_fixtures_graphic():
 
         # --- ÉTAPE DE VÉRIFICATION DANS LES LOGS ---
         print("\n" + "="*40)
-        print("📋 MATCHS DU ROUND 1 EXTRAITS AVEC SUCCÈS :")
+        print("📋 VÉRIFICATION PROPRE DES MATCHS DU ROUND 1 :")
         print("="*40)
-        for idx, (t1, t2) in enumerate(fixtures_data[:5], 1):
+        for idx, (t1, t2) in enumerate(fixtures_data, 1):
             print(f"Match {idx} : {t1}  VS  {t2}")
         print("="*40 + "\n")
 
