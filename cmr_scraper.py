@@ -14,54 +14,60 @@ async def generate_fixtures_graphic():
         await page.goto(url, wait_until="domcontentloaded", timeout=60000)
         await asyncio.sleep(5)
         
-        extracted_fixtures = []
-        seen = set()
+        # Extraction précise basée sur la structure exacte que tu as partagée
+        extracted_fixtures = await page.evaluate("""() => {
+            const fixtures = [];
+            const textContent = document.body.innerText;
+            
+            // On cherche à découper par les blocs "League · Round 1"
+            const blocks = textContent.split('League · Round 1');
+            
+            blocks.forEach(block => {
+                const lines = block.split('\\n').map(l => l.trim()).filter(l => l.length > 0);
+                
+                // Dans ton texte type, les équipes se trouvent autour de "0/2 played" ou avant/après les mots "SCHEDULED" / "crest"
+                // On filtre les lignes pour trouver les vrais noms d'équipes
+                const cleanedLines = [];
+                const skipWords = ['2 legs', 'scheduled', '0/2 played', 'tue', 'oct', 'nov', '2026', 'crest', 'today', 'matches'];
+                
+                for (let l of lines) {
+                    const lower = l.toLowerCase();
+                    if (!skipWords.some(w => lower.includes(w)) && l.length > 2 && l.length < 30) {
+                        cleanedLines.push(l);
+                    }
+                }
+                
+                // Si on a au moins 2 équipes valides dans ce bloc de round 1
+                if (cleanedLines.length >= 2) {
+                    const t1 = cleanedLines[0];
+                    const t2 = cleanedLines[1];
+                    if (!fixtures.some(f => f[0] === t1 && f[1] === t2) && t1 !== t2) {
+                        fixtures.push([t1, t2]);
+                    }
+                }
+            });
+            
+            return fixtures;
+        """)
 
-        # On cible les blocs contenaient à la fois "Round 1" et un statut de match (ex: scheduled)
-        cards = await page.locator("div").all()
+        print(f"🔍 Nombre de duos extraits : {len(extracted_fixtures)}")
 
-        for card in cards:
-            try:
-                text = await card.inner_text()
-                if "round 1" in text.lower() and ("scheduled" in text.lower() or "legs" in text.lower()):
-                    lines = [l.strip() for l in text.split("\n") if l.strip()]
-                    
-                    # Filtrer strictement les lignes pour ne garder que les noms des équipes
-                    ignored = ["league", "round", "1", "2 legs", "scheduled", "played", "tue", "oct", "nov", "2026", "0/2 played"]
-                    teams = []
-                    for l in lines:
-                        if 2 < len(l) < 30 and not any(w == l.lower() for w in ignored) and not any(w in l.lower() for w in ["oct", "nov", "2026", "played"]):
-                            teams.append(l)
-                    
-                    if len(teams) >= 2:
-                        t1 = teams[0]
-                        t2 = teams[1]
-                        match_key = f"{t1} vs {t2}"
-                        if match_key not in seen and t1 != t2:
-                            seen.add(match_key)
-                            extracted_fixtures.append((t1, t2))
-            except:
-                continue
-
-        # Sécurité : s'assurer d'avoir exactement les 5 matchs du Round 1
-        if len(extracted_fixtures) < 5:
-            print("⚠️ Complément automatique avec les 5 matchs de référence du Round 1.")
-            default_round_1 = [
+        # Si le scraping automatique a un souci, on intègre directement tes 5 vrais matchs exacts
+        if not extracted_fixtures or len(extracted_fixtures) < 5:
+            print("⚠️ Utilisation des 5 vrais matchs officiels du Round 1.")
+            extracted_fixtures = [
                 ("Viltrumites ES", "BLUE LOCK1"),
                 ("VNM Esports", "AUREUS ES"),
-                ("Team Alpha", "Team Beta"),
-                ("Gamma FC", "Delta Club"),
-                ("Eagles ESP", "Lions Gaming")
+                ("INFIRNO FC", "AJAX CASABLANCA"),
+                ("TEMARA FC", "FC L HOKOMA"),
+                ("LMRARCCA", "fc energy")
             ]
-            for match in default_round_1:
-                if len(extracted_fixtures) < 5 and match not in extracted_fixtures:
-                    extracted_fixtures.append(match)
 
         fixtures_to_render = extracted_fixtures[:5]
 
-        # --- VÉRIFICATION DANS LES LOGS (LES 5 MATCHS) ---
+        # --- VÉRIFICATION DANS LES LOGS ---
         print("\n" + "="*40)
-        print("📋 LES 5 MATCHS OFFICIELS DU ROUND 1 :")
+        print("📋 LES 5 VRAIS MATCHS DU ROUND 1 :")
         print("="*40)
         for idx, (t1, t2) in enumerate(fixtures_to_render, 1):
             print(f"Match {idx} : {t1}  VS  {t2}")
@@ -81,7 +87,7 @@ async def generate_fixtures_graphic():
     try:
         font_title = ImageFont.truetype("arial.ttf", 55)
         font_sub = ImageFont.truetype("arial.ttf", 30)
-        font_match = ImageFont.truetype("arial.ttf", 30)
+        font_match = ImageFont.truetype("arial.ttf", 28)
     except:
         font_title = ImageFont.load_default()
         font_sub = ImageFont.load_default()
@@ -90,15 +96,15 @@ async def generate_fixtures_graphic():
     draw.text((W/2, 110), "PROGRAMME DU JOUR", fill="#d4af37", anchor="mm", font=font_title)
     draw.text((W/2, 175), "LIGUE • ROUND 1 (5 MATCHS)", fill="#00b4db", anchor="mm", font=font_sub)
     
-    start_y = 240
-    row_height = 190 # Hauteur optimisée pour loger proprement les 5 cartes de matchs
+    start_y = 230
+    row_height = 190
     
     for i, (team_a, team_b) in enumerate(fixtures_to_render):
         y = start_y + (i * row_height)
         draw.rectangle([80, y, W-80, y + 160], fill="#0d1930", outline="#d4af37", width=2)
-        draw.text((160, y + 80), team_a.upper()[:16], fill="#ffffff", anchor="lm", font=font_match)
+        draw.text((160, y + 80), team_a.upper()[:18], fill="#ffffff", anchor="lm", font=font_match)
         draw.text((W/2, y + 80), "VS", fill="#00b4db", anchor="mm", font=font_match)
-        draw.text((W - 160, y + 80), team_b.upper()[:16], fill="#ffffff", anchor="rm", font=font_match)
+        draw.text((W - 160, y + 80), team_b.upper()[:18], fill="#ffffff", anchor="rm", font=font_match)
         
     output_path = "instagram_post.png"
     img.save(output_path)
