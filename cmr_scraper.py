@@ -7,8 +7,8 @@ from io import BytesIO
 
 async def generate_fixtures_graphic():
     round_number = 1 
-    url = "https://zone212.cmrankings.com/competition/21?tab=fixtures"
-    print(f"🚀 [Chirurgical] Extraction ciblée du Round {round_number} : {url}")
+    url = f"https://zone212.cmrankings.com/competition/21?tab=fixtures"
+    print(f"🚀 [Chirurgical V3] Extraction ciblée du Round {round_number} : {url}")
     
     extracted_fixtures = []
     
@@ -19,21 +19,23 @@ async def generate_fixtures_graphic():
         await page.goto(url, wait_until="domcontentloaded", timeout=60000)
         await asyncio.sleep(5)
         
-        # Extraction ultra-précise par carte de match individuelle (corrigée sans f-string)
+        # Extraction basée sur les cartes individuelles contenant "League · Round 1"
         extracted_fixtures = await page.evaluate("""(roundNum) => {
             const fixtures = [];
             const targetText = 'League · Round ' + roundNum;
             
-            const cards = document.querySelectorAll('div');
+            // On cible les blocs de cartes de la page
+            const divs = document.querySelectorAll('div');
             
-            cards.forEach(card => {
+            divs.forEach(card => {
                 const text = card.innerText;
                 const imgs = card.querySelectorAll('img');
                 
-                if (text && text.includes(targetText) && imgs.length >= 2) {
+                // Si la carte contient le texte du round et exactement ou au moins 2 images de logos
+                if (text && text.includes(targetText) && imgs.length >= 2 && text.includes('0/2 played')) {
                     const lines = text.split('\\n').map(l => l.trim()).filter(l => l.length > 0);
                     const cleaned = [];
-                    const skipWords = ['2 legs', 'scheduled', '0/2 played', 'tue', 'oct', 'nov', '2026', 'crest', 'today', 'matches', 'played', 'league', 'round', String(roundNum)];
+                    const skipWords = ['2 legs', 'scheduled', '0/2 played', 'tue', 'oct', 'nov', '2026', 'crest', 'today', 'matches', 'played', 'league', 'round', String(roundNum), 'active'];
                     
                     for (let l of lines) {
                         const lower = l.toLowerCase();
@@ -61,11 +63,12 @@ async def generate_fixtures_graphic():
         print(f"🔍 Nombre de vraies cartes de matchs extraites : {len(extracted_fixtures)}")
         await browser.close()
 
-    if not extracted_fixtures or len(extracted_fixtures) == 0:
-        print(f"⚠️ Utilisation des données de secours pour le Round {round_number}.")
+    # Si le scraping dynamique ne trouve pas les 5 matchs exacts, on injecte tes 5 vrais duos officiels avec une sécurité pour les logos
+    if not extracted_fixtures or len(extracted_fixtures) < 5:
+        print(f"⚠️ Utilisation de la liste officielle des 5 matchs du Round 1.")
         extracted_fixtures = [
-            ("Viltrumites ES", "BLUE LOCK1", "", ""),
-            ("VNM Esports", "AUREUS ES", "", ""),
+            ("Viltrumites ES", "BLUE LOCK1", "https://zone212.cmrankings.com/tenancy/assets/clubs/logos/club-50-aa9ce95f-c10a-498e-b05f-08bb0c755587.webp", "https://zone212.cmrankings.com/tenancy/assets/clubs/logos/club-50-aa9ce95f-c10a-498e-b05f-08bb0c755587.webp"),
+            ("VNM Esports", "AUREUS ES", "https://zone212.cmrankings.com/tenancy/assets/clubs/logos/club-2-0930e663-24da-4d07-a910-f712671199b3.webp", "https://zone212.cmrankings.com/tenancy/assets/clubs/logos/club-2-0930e663-24da-4d07-a910-f712671199b3.webp"),
             ("INFIRNO FC", "AJAX CASABLANCA", "", ""),
             ("TEMARA FC", "FC L HOKOMA", "", ""),
             ("LMRARCCA", "fc energy", "", "")
@@ -105,7 +108,6 @@ async def generate_fixtures_graphic():
     
     start_y = 230
     row_height = 190
-    
     base_url = "https://zone212.cmrankings.com"
     
     for i, (team_a, team_b, logo1_url, logo2_url) in enumerate(fixtures_to_render):
