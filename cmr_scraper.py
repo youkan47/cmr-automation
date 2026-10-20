@@ -1,59 +1,79 @@
 import asyncio
+import os
 from playwright.async_api import async_playwright
+from PIL import Image, ImageDraw, ImageFont
+import requests
 
-async def scrape_cmr_competition(competition_id, tab="standings"):
-    url = f"https://zone212.cmrankings.com/competition/{competition_id}?tab={tab}"
-    print(f"🚀 Connexion à la plateforme CMR pour la compétition {competition_id} ({tab})...")
+async def generate_cmr_graphic():
+    url = "https://zone212.cmrankings.com/competition/21?tab=standings"
+    print(f"🚀 Connexion et extraction des données depuis {url}...")
     
     async with async_playwright() as p:
-        # Lancement d'un navigateur headless dans le cloud
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
-        
-        # Accès à la page et attente du chargement complet du JavaScript
         await page.goto(url, wait_until="networkidle")
         await asyncio.sleep(3)
         
+        # Extraction des lignes du tableau de classement
+        rows = await page.locator("table tbody tr, tr").all()
         extracted_data = []
         
-        if tab == "standings":
-            rows = await page.locator("table tbody tr, tr").all()
-            for idx, row in enumerate(rows):
-                text_content = await row.inner_text()
-                lines = [line.strip() for line in text_content.split("\n") if line.strip()]
-                
-                img_element = row.locator("img")
-                logo_url = ""
-                if await img_element.count() > 0:
-                    logo_url = await img_element.first.get_attribute("src") or ""
-                
-                if lines:
-                    extracted_data.append({
-                        "rang": idx + 1,
-                        "details": lines,
-                        "logo": logo_url
-                    })
-        else:
-            match_cards = await page.locator(".match-card, tr, [class*='fixture'], [class*='match']").all()
-            for idx, card in enumerate(match_cards):
-                text_content = await card.inner_text()
-                lines = [line.strip() for line in text_content.split("\n") if line.strip()]
-                
-                imgs = await card.locator("img").all()
-                logos = [await img.get_attribute("src") for img in imgs]
-                
-                if len(lines) >= 2:
-                    extracted_data.append({
-                        "match": idx + 1,
-                        "details": lines,
-                        "logos": logos
-                    })
-                    
+        for idx, row in enumerate(rows):
+            text_content = await row.inner_text()
+            lines = [line.strip() for line in text_content.split("\n") if line.strip()]
+            img_element = row.locator("img")
+            logo_url = ""
+            if await img_element.count() > 0:
+                logo_url = await img_element.first.get_attribute("src") or ""
+            
+            if lines and idx < 10: # Top 10 clubs
+                extracted_data.append({
+                    "rang": str(idx + 1),
+                    "name": lines[0] if len(lines) > 0 else f"Club {idx+1}",
+                    "logo": logo_url
+                })
         await browser.close()
-        print(f"✅ Extraction réussie ! {len(extracted_data)} éléments trouvés.")
-        print(extracted_data)
-        return extracted_data
+
+    print(f"✅ Données extraites : {len(extracted_data)} clubs trouvés.")
+    
+    # --- CRÉATION DU GRAPHIQUE INSTAGRAM (1080x1350) ---
+    W, H = 1080, 1350
+    img = Image.new("RGB", (W, H), color="#050913")
+    draw = ImageDraw.Draw(img)
+    
+    # Cadre et bordures esport (Or et Bleu)
+    draw.rectangle([36, 36, W-36, H-36], outline="#d4af37", width=4)
+    draw.rectangle([46, 46, W-46, H-46], outline="#00b4db", width=2)
+    
+    # Polices par défaut (évite les erreurs si les fichiers de police manquent)
+    try:
+        font_title = ImageFont.truetype("arial.ttf", 60)
+        font_sub = ImageFont.truetype("arial.ttf", 32)
+    except:
+        font_title = ImageFont.load_default()
+        font_sub = ImageFont.load_default()
+        
+    # Titres de l'affiche
+    draw.text((W/2, 120), "CLASSEMENT OFFICIEL", fill="#d4af37", anchor="mm", font=font_title)
+    draw.text((W/2, 200), "CMR LEAGUE • SAISON 4", fill="#00b4db", anchor="mm", font=font_sub)
+    
+    # Dessin des lignes de classement
+    start_y = 300
+    row_height = 85
+    
+    for i, club in enumerate(extracted_data[:8]):
+        y = start_y + (i * row_height)
+        # Fond de chaque ligne
+        draw.rectangle([70, y, W-70, y + 70], fill="#0d1930", outline="#00b4db" if i>2 else "#d4af37", width=2)
+        # Rang
+        draw.text((110, y + 35), str(club["rang"]), fill="#d4af37", anchor="mm", font=font_sub)
+        # Nom du club
+        draw.text((200, y + 35), club["name"].upper(), fill="#ffffff", anchor="lm", font=font_sub)
+        
+    # Sauvegarde du fichier image final
+    output_path = "instagram_post.png"
+    img.save(output_path)
+    print(f"🎨 Graphique Instagram généré avec succès : {output_path}")
 
 if __name__ == "__main__":
-    # Test avec la compétition 21 (onglets fixtures / matchs)
-    asyncio.run(scrape_cmr_competition(21, tab="fixtures"))
+    asyncio.run(generate_cmr_graphic())
