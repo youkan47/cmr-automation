@@ -96,7 +96,6 @@ async def generate_fixtures_graphic():
 
     fixtures_to_render = extracted_fixtures[:5]
 
-    # Correction ici : utilisation de .upper() au lieu de .toUpperCase()
     final_fixtures_with_logos = []
     for t1, t2 in fixtures_to_render:
         logo1 = team_logos.get(t1.upper(), "")
@@ -115,4 +114,62 @@ async def generate_fixtures_graphic():
 
     # --- CRÉATION DE L'AFFICHE INSTAGRAM (1080x1350) ---
     W, H = 1080, 1350
-    img = Image.new("RGB", (W, H), color="#05091
+    img = Image.new("RGB", (W, H), color="#050913")
+    draw = ImageDraw.Draw(img)
+    
+    draw.rectangle([36, 36, W-36, H-36], outline="#d4af37", width=4)
+    draw.rectangle([46, 46, W-46, H-46], outline="#00b4db", width=2)
+    
+    try:
+        font_title = ImageFont.truetype("arial.ttf", 55)
+        font_sub = ImageFont.truetype("arial.ttf", 30)
+        font_match = ImageFont.truetype("arial.ttf", 26)
+    except:
+        font_title = ImageFont.load_default()
+        font_sub = ImageFont.load_default()
+        font_match = ImageFont.load_default()
+        
+    draw.text((W/2, 110), "PROGRAMME DU JOUR", fill="#d4af37", anchor="mm", font=font_title)
+    draw.text((W/2, 175), f"LIGUE • ROUND {round_number} ({len(final_fixtures_with_logos)} MATCHS)", fill="#00b4db", anchor="mm", font=font_sub)
+    
+    start_y = 230
+    row_height = 190
+    
+    for i, (team_a, team_b, logo1_url, logo2_url) in enumerate(final_fixtures_with_logos):
+        y = start_y + (i * row_height)
+        
+        draw.rectangle([80, y, W-80, y + 160], fill="#0d1930", outline="#d4af37", width=2)
+        
+        if logo1_url and not logo1_url.startswith("http"):
+            logo1_url = base_url + logo1_url
+        if logo2_url and not logo2_url.startswith("http"):
+            logo2_url = base_url + logo2_url
+
+        if logo1_url:
+            try:
+                response = requests.get(logo1_url, timeout=5)
+                logo_img = Image.open(BytesIO(response.content)).convert("RGBA")
+                logo_img = logo_img.resize((80, 80), Image.Resampling.LANCZOS)
+                img.paste(logo_img, (110, y + 40), logo_img)
+            except Exception as e:
+                print(f"Erreur logo 1: {e}")
+                
+        if logo2_url:
+            try:
+                response = requests.get(logo2_url, timeout=5)
+                logo_img = Image.open(BytesIO(response.content)).convert("RGBA")
+                logo_img = logo_img.resize((80, 80), Image.Resampling.LANCZOS)
+                img.paste(logo_img, (W - 190, y + 40), logo_img)
+            except Exception as e:
+                print(f"Erreur logo 2: {e}")
+
+        draw.text((210, y + 80), team_a.upper()[:15], fill="#ffffff", anchor="lm", font=font_match)
+        draw.text((W/2, y + 80), "VS", fill="#00b4db", anchor="mm", font=font_match)
+        draw.text((W - 210, y + 80), team_b.upper()[:15], fill="#ffffff", anchor="rm", font=font_match)
+        
+    output_path = "instagram_post.png"
+    img.save(output_path)
+    print(f"🎨 Affiche parfaite avec logos du classement générée avec succès : {output_path}")
+
+if __name__ == "__main__":
+    asyncio.run(generate_fixtures_graphic())
