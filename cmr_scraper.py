@@ -12,18 +12,7 @@ async def generate_fixtures_graphic():
     standings_url = f"{base_url}/competition/21?tab=standings"
     fixtures_url = f"{base_url}/competition/21?tab=fixtures"
     
-    competition_logo_url = "https://zone212.cmrankings.com/tenancy/assets/competitions/logos/competition-21-ed4d38e3-a842-4c11-9d00-79b94db30ed7.webp"
-    
-    # Téléchargement d'une police bold moderne et épurée (Roboto Bold) depuis Google Fonts
-    font_path = "EditorialFont.ttf"
-    if not os.path.exists(font_path):
-        print("📥 Téléchargement de la police éditoriale moderne...")
-        ttf_url = "https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Bold.ttf"
-        r = requests.get(ttf_url)
-        with open(font_path, "wb") as f:
-            f.write(r.content)
-
-    print(f"🚀 [Editorial Pro] Connexion au classement pour récupérer les logos...")
+    print(f"🚀 [Pro Broadcast Design] Récupération des logos et des matchs...")
     
     team_logos = {}
     extracted_fixtures = []
@@ -32,7 +21,7 @@ async def generate_fixtures_graphic():
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
         
-        # --- ÉTAPE 1 : Récupérer les logos depuis l'onglet STANDINGS ---
+        # --- ÉTAPE 1 : Récupérer les logos depuis STANDINGS ---
         await page.goto(standings_url, wait_until="domcontentloaded", timeout=60000)
         await asyncio.sleep(4)
         
@@ -54,11 +43,8 @@ async def generate_fixtures_graphic():
             });
             return logosMap;
         }""")
-        
-        print(f"✅ Logos récupérés pour {len(team_logos)} équipes.")
 
-        # --- ÉTAPE 2 : Récupérer les matchs du Round depuis l'onglet FIXTURES ---
-        print(f"🚀 Connexion aux matchs du Round {round_number}...")
+        # --- ÉTAPE 2 : Récupérer les matchs du Round depuis FIXTURES ---
         await page.goto(fixtures_url, wait_until="domcontentloaded", timeout=60000)
         await asyncio.sleep(4)
         
@@ -96,7 +82,6 @@ async def generate_fixtures_graphic():
         await browser.close()
 
     if not extracted_fixtures or len(extracted_fixtures) < 5:
-        print("⚠️ Utilisation de la liste officielle des 5 matchs du Round 1.")
         extracted_fixtures = [
             ("Viltrumites ES", "BLUE LOCK1"),
             ("VNM Esports", "AUREUS ES"),
@@ -113,78 +98,92 @@ async def generate_fixtures_graphic():
         logo2 = team_logos.get(t2.upper(), "")
         final_fixtures_with_logos.append((t1, t2, logo1, logo2))
 
-    # --- CRÉATION DE L'AFFICHE ÉDITORIALE CARRÉE (1080x1080) ---
-    W, H = 1080, 1080
-    img = Image.new("RGB", (W, H), color="#03060a") # Noir carbone ultra-propre
+    # --- CHARGEMENT DU MASTER BACKGROUND DE RÉFÉRENCE ---
+    bg_path = "master_bg.png"
+    if os.path.exists(bg_path):
+        img = Image.open(bg_path).convert("RGB")
+        print("✅ master_bg.png chargé avec succès !")
+    else:
+        img = Image.new("RGB", (1080, 1080), color="#050913")
+        
+    W, H = img.size
     draw = ImageDraw.Draw(img)
-    
-    # Bordures fines et élégantes inspirées du style éditorial
-    draw.rectangle([30, 30, W-30, H-30], outline="#1e293b", width=2)
-    draw.line([(50, 160), (W - 50, 160)], fill="#00b4db", width=2) # Ligne de accent néon cyan
-    
-    # Logo de la compétition centré en haut
-    if competition_logo_url:
-        try:
-            res = requests.get(competition_logo_url, timeout=5)
-            comp_logo = Image.open(BytesIO(res.content)).convert("RGBA")
-            comp_logo = comp_logo.resize((90, 90), Image.Resampling.LANCZOS)
-            img.paste(comp_logo, (W//2 - 45, 45), comp_logo)
-        except Exception as e:
-            print(f"Erreur chargement logo compétition : {e}")
+
+    # Téléchargement d'une police bold moderne et percutante
+    font_path = "BroadcastFont.ttf"
+    if not os.path.exists(font_path):
+        ttf_url = "https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Bold.ttf"
+        r = requests.get(ttf_url)
+        with open(font_path, "wb") as f:
+            f.write(r.content)
 
     try:
-        font_title = ImageFont.truetype(font_path, 48) # Titre éditorial épuré et large
-        font_match = ImageFont.truetype(font_path, 32) # Noms d'équipes bold et lisibles
+        font_title = ImageFont.truetype(font_path, 72)
+        font_match = ImageFont.truetype(font_path, 34)
+        font_vs = ImageFont.truetype(font_path, 28)
     except:
         font_title = ImageFont.load_default()
         font_match = ImageFont.load_default()
+        font_vs = ImageFont.load_default()
         
-    # En-tête : MATCHDAY 1 (Style minimaliste / éditorial)
-    draw.text((W/2, 215), "MATCHDAY 1", fill="#ffffff", anchor="mm", font=font_title)
+    # Titre "MATCHDAY 1" avec effet doré textuel élégant
+    title_text = "MATCHDAY 1"
+    # Effet d'ombre portée pour le titre
+    draw.text((W/2 + 3, 208), title_text, fill="#000000", anchor="mm", font=font_title)
+    draw.text((W/2, 205), title_text, fill="#F3C653", anchor="mm", font=font_title) # Or brillant
     
-    # --- INSERTION DES CARTES DE MATCHS STYLE ÉDITORIAL ---
+    # --- INSERTION DES LIGNES DE MATCHS (Style Broadcast Pro) ---
     start_y = 280
-    row_height = 145
+    row_height = 138
     
     for i, (team_a, team_b, logo1_url, logo2_url) in enumerate(final_fixtures_with_logos):
         y = start_y + (i * row_height)
         
-        # Carte de match sombre avec une bordure subtile
-        draw.rectangle([70, y, W-70, y + 125], fill="#0b1325", outline="#1e293b", width=1)
+        # Bandeau de match semi-transparent élégant
+        draw.rectangle([75, y, W-75, y + 115], fill=(8, 18, 38, 220), outline=(212, 175, 55, 120), width=1)
+        
+        # Ligne lumineuse dorée sous chaque match (effet néon de l'exemple)
+        draw.line([(85, y + 115), (W - 85, y + 115)], fill="#E5B84B", width=2)
         
         if logo1_url and not logo1_url.startswith("http"):
             logo1_url = base_url + logo1_url
         if logo2_url and not logo2_url.startswith("http"):
             logo2_url = base_url + logo2_url
 
-        # Insertion Logo Équipe 1 (60x60)
+        # Insertion Logo Équipe 1 (Circulaires / Redimensionnés à 68x68)
         if logo1_url:
             try:
                 response = requests.get(logo1_url, timeout=5)
                 logo_img = Image.open(BytesIO(response.content)).convert("RGBA")
-                logo_img = logo_img.resize((60, 60), Image.Resampling.LANCZOS)
-                img.paste(logo_img, (100, y + 32), logo_img)
+                logo_img = logo_img.resize((68, 68), Image.Resampling.LANCZOS)
+                img.paste(logo_img, (105, y + 23), logo_img)
             except Exception as e:
                 print(f"Erreur logo 1: {e}")
                 
-        # Insertion Logo Équipe 2 (60x60)
+        # Insertion Logo Équipe 2
         if logo2_url:
             try:
                 response = requests.get(logo2_url, timeout=5)
                 logo_img = Image.open(BytesIO(response.content)).convert("RGBA")
-                logo_img = logo_img.resize((60, 60), Image.Resampling.LANCZOS)
-                img.paste(logo_img, (W - 160, y + 32), logo_img)
+                logo_img = logo_img.resize((68, 68), Image.Resampling.LANCZOS)
+                img.paste(logo_img, (W - 173, y + 23), logo_img)
             except Exception as e:
                 print(f"Erreur logo 2: {e}")
 
-        # Noms des équipes & Séparateur VS minimaliste
-        draw.text((180, y + 62), team_a.upper()[:14], fill="#f8fafc", anchor="lm", font=font_match)
-        draw.text((W/2, y + 62), "VS", fill="#00b4db", anchor="mm", font=font_match)
-        draw.text((W - 180, y + 62), team_b.upper()[:14], fill="#f8fafc", anchor="rm", font=font_match)
+        # Petit badge "VS" central en cyan néon
+        vs_box_w, vs_box_h = 56, 36
+        vs_x = W // 2 - vs_box_w // 2
+        vs_y = y + 40
+        draw.rectangle([vs_x, vs_y, vs_x + vs_box_w, vs_y + vs_box_h], fill="#03060A", outline="#00B4DB", width=2)
+        draw.text((W/2, y + 58), "VS", fill="#00B4DB", anchor="mm", font=font_vs)
+
+        # Noms des équipes bien lisibles en blanc
+        draw.text((195, y + 58), team_a.upper()[:13], fill="#FFFFFF", anchor="lm", font=font_match)
+        draw.text((W - 195, y + 58), team_b.upper()[:13], fill="#FFFFFF", anchor="rm", font=font_match)
         
     output_path = "instagram_post.png"
     img.save(output_path)
-    print(f"🎨 Affiche éditoriale générée avec succès : {output_path}")
+    print(f"🎨 Affiche style broadcast générée avec succès : {output_path}")
 
 if __name__ == "__main__":
     asyncio.run(generate_fixtures_graphic())
