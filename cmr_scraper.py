@@ -12,7 +12,7 @@ async def generate_fixtures_graphic():
     standings_url = f"{base_url}/competition/21?tab=standings"
     fixtures_url = f"{base_url}/competition/21?tab=fixtures"
     
-    print(f"🚀 [Pro Taille XXL] Récupération des logos et des matchs...")
+    print(f"🚀 [Pro Fix Boucle & XXL] Récupération des logos et des matchs...")
     
     team_logos = {}
     extracted_fixtures = []
@@ -118,9 +118,9 @@ async def generate_fixtures_graphic():
         with open(font_path, "wb") as f:
             f.write(r.content)
 
-    # TAILLES XXL ADAPTÉES À LA HAUTE RÉSOLUTION DE TON IMAGE DE FOND
+    # TAILLES XXL
     title_font_size = int(W * 0.08)   # 8% de la largeur pour le titre
-    match_font_size = int(W * 0.038)  # 3.8% de la largeur pour les équipes (très grand et visible)
+    match_font_size = int(W * 0.038)  # 3.8% pour les équipes (très grand et visible)
 
     try:
         font_title = ImageFont.truetype(font_path, title_font_size)
@@ -129,13 +129,13 @@ async def generate_fixtures_graphic():
         font_title = ImageFont.load_default()
         font_match = ImageFont.load_default()
         
-    # Titre "MATCHDAY 1" positionné sous le logo
+    # Titre "MATCHDAY 1"
     title_text = "MATCHDAY 1"
     title_y = int(H * 0.22)
     draw.text((W/2 + 6, title_y + 6), title_text, fill="#000000", anchor="mm", font=font_title)
     draw.text((W/2, title_y), title_text, fill="#F3C653", anchor="mm", font=font_title)
     
-    # --- INSERTION DES LIGNES DE MATCHS (Taille massive, sans VS) ---
+    # --- INSERTION DES LIGNES DE MATCHS (Boucle corrigée sur final_fixtures_with_logos) ---
     start_y = int(H * 0.30)
     available_height = H * 0.63
     row_height = int(available_height / 5)
@@ -143,7 +143,7 @@ async def generate_fixtures_graphic():
     
     margin_x = int(W * 0.06)
     
-    for i, (team_a, team_b, logo1_url, logo2_url) in enumerate(fixtures_to_render):
+    for i, (team_a, team_b, logo1_url, logo2_url) in enumerate(final_fixtures_with_logos):
         y = start_y + (i * row_height)
         
         # Bandeau de match semi-transparent
@@ -180,14 +180,6 @@ async def generate_fixtures_graphic():
             except Exception as e:
                 print(f"Erreur logo 2: {e}")
 
-        # Noms des équipes en format XXL, bien lisibles des deux côtés
+        # Noms des équipes en format XXL
         text_y = y + bar_height / 2
-        draw.text((margin_x + logo_size + int(65), text_y), team_a.upper()[:14], fill="#FFFFFF", anchor="lm", font=font_match)
-        draw.text((W - margin_x - logo_size - int(65), text_y), team_b.upper()[:14], fill="#FFFFFF", anchor="rm", font=font_match)
-        
-    output_path = "instagram_post.png"
-    img.save(output_path)
-    print(f"🎨 Affiche XXL avec gros textes générée avec succès : {output_path}")
-
-if __name__ == "__main__":
-    asyncio.run(generate_fixtures_graphic())
+        draw.text
