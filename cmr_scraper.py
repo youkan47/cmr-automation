@@ -22,19 +22,18 @@ async def generate_fixtures_graphic():
         await page.goto(url, wait_until="domcontentloaded", timeout=60000)
         await asyncio.sleep(5)
         
-        # Extraction intelligente via JavaScript pour récupérer les équipes et les URLs des logos associés
-        extracted_fixtures = await page.evaluate(f"""() => {{
+        # Extraction via JavaScript (corrigé sans f-string pour éviter les conflits d'accolades)
+        extracted_fixtures = await page.evaluate("""(roundNum) => {
             const fixtures = [];
-            const targetText = 'League · Round {round_number}';
+            const targetText = 'League · Round ' + roundNum;
             
-            // On cherche tous les éléments de la page pour repérer les cartes du round
             const divs = document.querySelectorAll('div');
-            divs.forEach(card => {{
+            divs.forEach(card => {
                 const text = card.innerText;
-                if (text && text.includes(targetText) && (text.includes('SCHEDULED') || text.includes('0/2 played'))) {{
+                if (text && text.includes(targetText) && (text.includes('SCHEDULED') || text.includes('0/2 played'))) {
                     const lines = text.split('\\n').map(l => l.trim()).filter(l => l.length > 0);
                     const cleaned = [];
-                    const skipWords = ['2 legs', 'scheduled', '0/2 played', 'tue', 'oct', 'nov', '2026', 'crest', 'today', 'matches', 'played', 'league', 'round', '{round_number}'];
+                    const skipWords = ['2 legs', 'scheduled', '0/2 played', 'tue', 'oct', 'nov', '2026', 'crest', 'today', 'matches', 'played', 'league', 'round', String(roundNum)];
                     
                     for (let l of lines) {
                         const lower = l.toLowerCase();
@@ -43,23 +42,22 @@ async def generate_fixtures_graphic():
                         }
                     }
                     
-                    if (cleaned.length >= 2) {{
+                    if (cleaned.length >= 2) {
                         const t1 = cleaned[0];
                         const t2 = cleaned[1];
                         
-                        // Récupérer les liens des logos (balises img) à l'intérieur de la carte
                         const imgs = card.querySelectorAll('img');
                         let logo1 = imgs.length > 0 ? imgs[0].src : '';
                         let logo2 = imgs.length > 1 ? imgs[1].src : '';
                         
-                        if (!fixtures.some(f => f[0] === t1 && f[1] === t2) && t1 !== t2) {{
+                        if (!fixtures.some(f => f[0] === t1 && f[1] === t2) && t1 !== t2) {
                             fixtures.push([t1, t2, logo1, logo2]);
-                        }}
-                    }}
-                }}
-            }});
+                        }
+                    }
+                }
+            });
             return fixtures;
-        }}""")
+        }""", round_number)
 
         print(f"🔍 Nombre de duos avec logos extraits : {len(extracted_fixtures)}")
         await browser.close()
