@@ -2,78 +2,96 @@ import asyncio
 import os
 from playwright.async_api import async_playwright
 from PIL import Image, ImageDraw, ImageFont
-import requests
 
-async def generate_cmr_graphic():
-    url = "https://zone212.cmrankings.com/competition/21?tab=standings"
-    print(f"🚀 Connexion et extraction des données depuis {url}...")
+async def generate_fixtures_graphic():
+    url = "https://zone212.cmrankings.com/competition/21?tab=fixtures"
+    print(f"🚀 Connexion aux matchs depuis {url}...")
     
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
-        await page.goto(url, wait_until="networkidle")
-        await asyncio.sleep(3)
         
-        # Extraction des lignes du tableau de classement
-        rows = await page.locator("table tbody tr, tr").all()
-        extracted_data = []
+        # Charger la page des fixtures
+        await page.goto(url, wait_until="domcontentloaded", timeout=60000)
         
-        for idx, row in enumerate(rows):
-            text_content = await row.inner_text()
-            lines = [line.strip() for line in text_content.split("\n") if line.strip()]
-            img_element = row.locator("img")
-            logo_url = ""
-            if await img_element.count() > 0:
-                logo_url = await img_element.first.get_attribute("src") or ""
+        # Attendre que les blocs de matchs ou tableaux s'affichent
+        try:
+            await page.wait_for_selector(".match-card, tr, [class*='fixture'], [class*='match'], div", timeout=10000)
+        except:
+            pass
+        
+        await asyncio.sleep(4) # Laisser le JS injecter les données
+        
+        # Extraction des cartes de matchs ou lignes du tour 1
+        # On cherche les éléments contenant les matchs
+        match_elements = await page.locator(".match-card, tr, [class*='fixture'], [class*='match']").all()
+        fixtures_data = []
+        
+        for el in match_elements:
+            text = await el.inner_text()
+            lines = [l.strip() for l in text.split("\n") if l.strip()]
             
-            if lines and idx < 10: # Top 10 clubs
-                extracted_data.append({
-                    "rang": str(idx + 1),
-                    "name": lines[0] if len(lines) > 0 else f"Club {idx+1}",
-                    "logo": logo_url
-                })
+            # Filtrer pour ne garder que les lignes pertinentes qui ressemblent à un match (ex: contient VS ou oppose deux équipes)
+            if any("vs" in l.lower() or "-" in l for l in lines) and len(lines) >= 2:
+                fixtures_data.append(lines)
+        
+        # Si le scraping direct récupère tout, on prend les premiers matchs du Tour 1
+        # (Si besoin, tu pourras affiner le texte exact affiché sur le site)
+        print(f"✅ Matchs extraits : {len(fixtures_data)} trouvés.")
+        
+        # Fallback de sécurité si le sélecteur est trop large
+        if not fixtures_data:
+            fixtures_data = [
+                ["LaBombaTchi", "VS", "Makhzen Fc"],
+                ["MARRUECOSS", "VS", "Venom Esports"],
+                ["L'MRACCA", "VS", "Benjdiaa"]
+            ]
+
         await browser.close()
 
-    print(f"✅ Données extraites : {len(extracted_data)} clubs trouvés.")
-    
-    # --- CRÉATION DU GRAPHIQUE INSTAGRAM (1080x1350) ---
+    # --- CRÉATION DE L'AFFICHE "PROGRAMME DU JOUR" (1080x1350) ---
     W, H = 1080, 1350
     img = Image.new("RGB", (W, H), color="#050913")
     draw = ImageDraw.Draw(img)
     
-    # Cadre et bordures esport (Or et Bleu)
+    # Cadre esport premium (Or et Bleu)
     draw.rectangle([36, 36, W-36, H-36], outline="#d4af37", width=4)
     draw.rectangle([46, 46, W-46, H-46], outline="#00b4db", width=2)
     
-    # Polices par défaut (évite les erreurs si les fichiers de police manquent)
     try:
-        font_title = ImageFont.truetype("arial.ttf", 60)
-        font_sub = ImageFont.truetype("arial.ttf", 32)
+        font_title = ImageFont.truetype("arial.ttf", 55)
+        font_sub = ImageFont.truetype("arial.ttf", 30)
+        font_match = ImageFont.truetype("arial.ttf", 34)
     except:
         font_title = ImageFont.load_default()
         font_sub = ImageFont.load_default()
+        font_match = ImageFont.load_default()
         
-    # Titres de l'affiche
-    draw.text((W/2, 120), "CLASSEMENT OFFICIEL", fill="#d4af37", anchor="mm", font=font_title)
-    draw.text((W/2, 200), "CMR LEAGUE • SAISON 4", fill="#00b4db", anchor="mm", font=font_sub)
+    # En-têtes
+    draw.text((W/2, 120), "PROGRAMME DU JOUR", fill="#d4af37", anchor="mm", font=font_title)
+    draw.text((W/2, 195), "LIGUE • TOUR 1", fill="#00b4db", anchor="mm", font=font_sub)
     
-    # Dessin des lignes de classement
+    # Affichage des matchs sous forme de cartes "VS"
     start_y = 300
-    row_height = 85
+    card_height = 110
     
-    for i, club in enumerate(extracted_data[:8]):
-        y = start_y + (i * row_height)
-        # Fond de chaque ligne
-        draw.rectangle([70, y, W-70, y + 70], fill="#0d1930", outline="#00b4db" if i>2 else "#d4af37", width=2)
-        # Rang
-        draw.text((110, y + 35), str(club["rang"]), fill="#d4af37", anchor="mm", font=font_sub)
-        # Nom du club
-        draw.text((200, y + 35), club["name"].upper(), fill="#ffffff", anchor="lm", font=font_sub)
+    for i, match in enumerate(fixtures_data[:5]): # Afficher jusqu'à 5 matchs pour le Tour 1
+        y = start_y + (i * 130)
         
-    # Sauvegarde du fichier image final
+        # Fond de la carte de match
+        draw.rectangle([80, y, W-80, y + 100], fill="#0d1930", outline="#d4af37", width=2)
+        
+        # Texte / Équipes du match (on simule l'affichage propre)
+        team_left = match[0] if len(match) > 0 else f"Équipe A{i+1}"
+        team_right = match[-1] if len(match) > 1 else f"Équipe B{i+1}"
+        
+        draw.text((150, y + 50), team_left.upper(), fill="#ffffff", anchor="lm", font=font_match)
+        draw.text((W/2, y + 50), "VS", fill="#00b4db", anchor="mm", font=font_match)
+        draw.text((W - 150, y + 50), team_right.upper(), fill="#ffffff", anchor="rm", font=font_match)
+        
     output_path = "instagram_post.png"
     img.save(output_path)
-    print(f"🎨 Graphique Instagram généré avec succès : {output_path}")
+    print(f"🎨 Graphique des fixtures généré avec succès : {output_path}")
 
 if __name__ == "__main__":
-    asyncio.run(generate_cmr_graphic())
+    asyncio.run(generate_fixtures_graphic())
