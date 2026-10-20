@@ -1,4 +1,4 @@
-name: CMR Scraper
+name: CMR Scraper & Generator
 
 on:
   workflow_dispatch:
@@ -17,8 +17,14 @@ jobs:
           
       - name: Install dependencies
         run: |
-          pip install playwright requests
+          pip install playwright requests pillow
           playwright install chromium
           
-      - name: Run Scraper Script
+      - name: Run Scraper Script & Build Image
         run: python cmr_scraper.py
+
+      - name: Upload Instagram Graphic Result
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmr-instagram-graphic
+          path: instagram_post.png
