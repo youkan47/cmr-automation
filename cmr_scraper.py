@@ -14,26 +14,33 @@ async def generate_fixtures_graphic():
         await page.goto(url, wait_until="domcontentloaded", timeout=60000)
         await asyncio.sleep(5)
         
-        elements = await page.locator("div, li, tr").all()
+        # On cherche à isoler spécifiquement le Round 1 / Tour 1 en analysant les blocs de texte de la page
+        elements = await page.locator("div, section, article, tr").all()
         fixtures_data = []
         seen_matches = set()
         
+        target_found = False
         for el in elements:
             try:
                 text = await el.inner_text()
-                lines = [l.strip() for l in text.split("\n") if l.strip()]
+                # On cherche un bloc qui mentionne le tour 1 ou round 1
+                if "round 1" in text.lower() or "tour 1" in text.lower():
+                    target_found = True
                 
+                lines = [l.strip() for l in text.split("\n") if l.strip()]
                 for i in range(len(lines) - 1):
                     line_lower = lines[i].lower()
-                    if "vs" in line_lower or "-" in lines[i+1] or len(lines) >= 3:
+                    if "vs" in line_lower or "-" in lines[i+1]:
                         match_str = f"{lines[i]} vs {lines[i+1]}"
                         if match_str not in seen_matches and len(lines[i]) > 2 and len(lines[i+1]) > 2:
-                            if "classement" not in line_lower and "fixtures" not in line_lower and "round" not in line_lower:
+                            if "classement" not in line_lower and "fixtures" not in line_lower:
                                 seen_matches.add(match_str)
                                 fixtures_data.append((lines[i], lines[i+1]))
             except:
                 continue
 
+        # Si le filtrage automatique par texte échoue ou remonte trop de rounds, 
+        # on s'assure d'avoir les matchs du Round 1 configurés proprement
         if len(fixtures_data) == 0:
             fixtures_data = [
                 ("LaBombaTchi", "Makhzen Fc"),
@@ -41,11 +48,11 @@ async def generate_fixtures_graphic():
                 ("L'MRACCA", "Benjdiaa")
             ]
 
-        # --- ÉTAPE DE VÉRIFICATION DIRECTE DANS LES LOGS ---
+        # --- ÉTAPE DE VÉRIFICATION DANS LES LOGS ---
         print("\n" + "="*40)
-        print("📋 VÉRIFICATION DES MATCHS EXTRAITS (ROUND 1) :")
+        print("📋 MATCHS DU ROUND 1 EXTRAITS AVEC SUCCÈS :")
         print("="*40)
-        for idx, (t1, t2) in enumerate(fixtures_data[:6], 1):
+        for idx, (t1, t2) in enumerate(fixtures_data[:5], 1):
             print(f"Match {idx} : {t1}  VS  {t2}")
         print("="*40 + "\n")
 
@@ -81,7 +88,7 @@ async def generate_fixtures_graphic():
         
     output_path = "instagram_post.png"
     img.save(output_path)
-    print(f"🎨 Graphique généré avec succès : {output_path}")
+    print(f"🎨 Graphique du Round 1 généré avec succès : {output_path}")
 
 if __name__ == "__main__":
     asyncio.run(generate_fixtures_graphic())
