@@ -22,7 +22,6 @@ async def generate_fixtures_graphic():
         await page.goto(url, wait_until="domcontentloaded", timeout=60000)
         await asyncio.sleep(5)
         
-        # Extraction via JavaScript (corrigé sans f-string pour éviter les conflits d'accolades)
         extracted_fixtures = await page.evaluate("""(roundNum) => {
             const fixtures = [];
             const targetText = 'League · Round ' + roundNum;
@@ -59,10 +58,9 @@ async def generate_fixtures_graphic():
             return fixtures;
         }""", round_number)
 
-        print(f"🔍 Nombre de duos avec logos extraits : {len(extracted_fixtures)}")
+        print(f"🔍 Nombre de duos extraits : {len(extracted_fixtures)}")
         await browser.close()
 
-    # Sécurité de secours si le scraping dynamique manque d'éléments
     if not extracted_fixtures or len(extracted_fixtures) < 5:
         print(f"⚠️ Utilisation des données de secours pour le Round {round_number}.")
         extracted_fixtures = [
@@ -75,20 +73,21 @@ async def generate_fixtures_graphic():
 
     fixtures_to_render = extracted_fixtures[:5]
 
-    # --- VÉRIFICATION DANS LES LOGS ---
-    print("\n" + "="*40)
-    print(f"📋 LES 5 MATCHS OFFICIELS DU ROUND {round_number} :")
-    print("="*40)
+    # --- ÉTAPE DE VÉRIFICATION DÉTAILLÉE DANS LES LOGS (ÉQUIPES + LOGOS) ---
+    print("\n" + "="*50)
+    print(f"📋 VÉRIFICATION DES MATCHS ET URLS DES LOGS (ROUND {round_number}) :")
+    print("="*50)
     for idx, match in enumerate(fixtures_to_render, 1):
-        print(f"Match {idx} : {match[0]}  VS  {match[1]}")
-    print("="*40 + "\n")
+        print(f"Match {idx} :")
+        print(f"  - Équipe 1 : {match[0]} | Logo : {match[2] if match[2] else '❌ AUCUN URL TROUVÉ'}")
+        print(f"  - Équipe 2 : {match[1]} | Logo : {match[3] if match[3] else '❌ AUCUN URL TROUVÉ'}")
+    print("="*50 + "\n")
 
     # --- CRÉATION DE L'AFFICHE INSTAGRAM (1080x1350) ---
     W, H = 1080, 1350
     img = Image.new("RGB", (W, H), color="#050913")
     draw = ImageDraw.Draw(img)
     
-    # Cadre esport premium (Or et Bleu)
     draw.rectangle([36, 36, W-36, H-36], outline="#d4af37", width=4)
     draw.rectangle([46, 46, W-46, H-46], outline="#00b4db", width=2)
     
@@ -110,10 +109,8 @@ async def generate_fixtures_graphic():
     for i, (team_a, team_b, logo1_url, logo2_url) in enumerate(fixtures_to_render):
         y = start_y + (i * row_height)
         
-        # Fond de la carte de match
         draw.rectangle([80, y, W-80, y + 160], fill="#0d1930", outline="#d4af37", width=2)
         
-        # Téléchargement et insertion du Logo Équipe 1 (à gauche)
         if logo1_url:
             try:
                 response = requests.get(logo1_url, timeout=5)
@@ -121,9 +118,8 @@ async def generate_fixtures_graphic():
                 logo_img = logo_img.resize((80, 80), Image.Resampling.LANCZOS)
                 img.paste(logo_img, (110, y + 40), logo_img)
             except Exception as e:
-                print(f"Erreur logo 1: {e}")
+                print(f"Erreur téléchargement logo 1 ({logo1_url}): {e}")
                 
-        # Téléchargement et insertion du Logo Équipe 2 (à droite)
         if logo2_url:
             try:
                 response = requests.get(logo2_url, timeout=5)
@@ -131,9 +127,8 @@ async def generate_fixtures_graphic():
                 logo_img = logo_img.resize((80, 80), Image.Resampling.LANCZOS)
                 img.paste(logo_img, (W - 190, y + 40), logo_img)
             except Exception as e:
-                print(f"Erreur logo 2: {e}")
+                print(f"Erreur téléchargement logo 2 ({logo2_url}): {e}")
 
-        # Noms des équipes & Séparateur VS
         draw.text((210, y + 80), team_a.upper()[:15], fill="#ffffff", anchor="lm", font=font_match)
         draw.text((W/2, y + 80), "VS", fill="#00b4db", anchor="mm", font=font_match)
         draw.text((W - 210, y + 80), team_b.upper()[:15], fill="#ffffff", anchor="rm", font=font_match)
