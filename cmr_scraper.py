@@ -14,7 +14,7 @@ async def generate_fixtures_graphic():
     
     competition_logo_url = "https://zone212.cmrankings.com/tenancy/assets/competitions/logos/competition-21-ed4d38e3-a842-4c11-9d00-79b94db30ed7.webp"
     
-    print(f"🚀 [Pro Design HD] Connexion au classement pour récupérer les logos...")
+    print(f"🚀 [Pro Design XXL] Connexion au classement pour récupérer les logos...")
     
     team_logos = {}
     extracted_fixtures = []
@@ -113,69 +113,69 @@ async def generate_fixtures_graphic():
     draw.rectangle([30, 30, W-30, H-30], outline="#d4af37", width=4)
     draw.rectangle([38, 38, W-38, H-38], outline="#00b4db", width=2)
     
-    # Logo de la compétition agrandi (130x130 px) centré en haut
+    # Logo de la compétition centré en haut
     if competition_logo_url:
         try:
             res = requests.get(competition_logo_url, timeout=5)
             comp_logo = Image.open(BytesIO(res.content)).convert("RGBA")
-            comp_logo = comp_logo.resize((130, 130), Image.Resampling.LANCZOS)
-            img.paste(comp_logo, (W//2 - 65, 42), comp_logo)
+            comp_logo = comp_logo.resize((120, 120), Image.Resampling.LANCZOS)
+            img.paste(comp_logo, (W//2 - 60, 42), comp_logo)
         except Exception as e:
             print(f"Erreur chargement logo compétition : {e}")
 
     try:
-        font_title = ImageFont.truetype("arial.ttf", 62) # Titre beaucoup plus grand
-        font_match = ImageFont.truetype("arial.ttf", 30) # Noms d'équipes plus grands et lisibles
+        font_title = ImageFont.truetype("arial.ttf", 124) # Doublé (anciennement 62)
+        font_match = ImageFont.truetype("arial.ttf", 60)  # Doublé (anciennement 30)
     except:
         font_title = ImageFont.load_default()
         font_match = ImageFont.load_default()
         
-    # En-tête : MATCHDAY 1 en grand format
-    draw.text((W/2, 195), "MATCHDAY 1", fill="#d4af37", anchor="mm", font=font_title)
+    # En-tête : MATCHDAY 1 en taille XXL
+    draw.text((W/2, 210), "MATCHDAY 1", fill="#d4af37", anchor="mm", font=font_title)
     
-    # --- INSERTION DES CARTES DE MATCHS (Optimisées pour le nouveau espacement) ---
-    start_y = 250
-    row_height = 150
+    # --- INSERTION DES CARTES DE MATCHS ---
+    start_y = 280
+    row_height = 145
     
     for i, (team_a, team_b, logo1_url, logo2_url) in enumerate(final_fixtures_with_logos):
         y = start_y + (i * row_height)
         
         # Fond de la carte de match
-        draw.rectangle([70, y, W-70, y + 132], fill="#0d1930", outline="#d4af37", width=2)
+        draw.rectangle([70, y, W-70, y + 130], fill="#0d1930", outline="#d4af37", width=2)
         
         if logo1_url and not logo1_url.startswith("http"):
             logo1_url = base_url + logo1_url
         if logo2_url and not logo2_url.startswith("http"):
             logo2_url = base_url + logo2_url
 
-        # Insertion Logo Équipe 1 (taille augmentée à 70x70 px)
+        # Insertion Logo Équipe 1
         if logo1_url:
             try:
                 response = requests.get(logo1_url, timeout=5)
                 logo_img = Image.open(BytesIO(response.content)).convert("RGBA")
-                logo_img = logo_img.resize((70, 70), Image.Resampling.LANCZOS)
-                img.paste(logo_img, (95, y + 31), logo_img)
+                logo_img = logo_img.resize((65, 65), Image.Resampling.LANCZOS)
+                img.paste(logo_img, (95, y + 32), logo_img)
             except Exception as e:
                 print(f"Erreur logo 1: {e}")
                 
-        # Insertion Logo Équipe 2 (taille augmentée à 70x70 px)
+        # Insertion Logo Équipe 2
         if logo2_url:
             try:
                 response = requests.get(logo2_url, timeout=5)
                 logo_img = Image.open(BytesIO(response.content)).convert("RGBA")
-                logo_img = logo_img.resize((70, 70), Image.Resampling.LANCZOS)
-                img.paste(logo_img, (W - 165, y + 31), logo_img)
+                logo_img = logo_img.resize((65, 65), Image.Resampling.LANCZOS)
+                img.paste(logo_img, (W - 160, y + 32), logo_img)
             except Exception as e:
                 print(f"Erreur logo 2: {e}")
 
-        # Noms des équipes (agrandis) et VS
-        draw.text((185, y + 66), team_a.upper()[:15], fill="#ffffff", anchor="lm", font=font_match)
-        draw.text((W/2, y + 66), "VS", fill="#00b4db", anchor="mm", font=font_match)
-        draw.text((W - 185, y + 66), team_b.upper()[:15], fill="#ffffff", anchor="rm", font=font_match)
+        # Noms des équipes (agrandis x2) et VS
+        draw.text((180, y + 65), team_a.upper()[:10], fill="#ffffff", anchor="lm", font=font_match)
+        draw.text((W/2, y + 65), "VS", fill="#00b4db", anchor="mm", font=font_match)
+        draw.text((W - 180, y + 65), team_b.upper()[:10], fill="#ffffff", anchor="rm", font=font_match)
         
     output_path = "instagram_post.png"
     img.save(output_path)
-    print(f"🎨 Affiche HD agrandie générée avec succès : {output_path}")
+    print(f"🎨 Affiche XXL générée avec succès : {output_path}")
 
 if __name__ == "__main__":
     asyncio.run(generate_fixtures_graphic())
