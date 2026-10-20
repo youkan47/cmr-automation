@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 async def generate_fixtures_graphic():
     # --- CONFIGURATION : CHANGE LE NUMÉRO DU ROUND ICI (1, 2, 3...) ---
-    round_number = 1 
+    round_number = 2
     # ----------------------------------------------------------------
     
     url = "https://zone212.cmrankings.com/competition/21?tab=fixtures"
