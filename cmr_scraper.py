@@ -14,7 +14,7 @@ async def generate_fixtures_graphic():
     
     competition_logo_url = "https://zone212.cmrankings.com/tenancy/assets/competitions/logos/competition-21-ed4d38e3-a842-4c11-9d00-79b94db30ed7.webp"
     
-    print(f"🚀 [Pro Design XXL] Connexion au classement pour récupérer les logos...")
+    print(f"🚀 [Pro Design Linux Font] Connexion au classement pour récupérer les logos...")
     
     team_logos = {}
     extracted_fixtures = []
@@ -123,25 +123,27 @@ async def generate_fixtures_graphic():
         except Exception as e:
             print(f"Erreur chargement logo compétition : {e}")
 
+    # Utilisation d'une police Linux standard (DejaVu Sans Bold) garantie sur GitHub Actions
+    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
     try:
-        font_title = ImageFont.truetype("arial.ttf", 124) # Doublé (anciennement 62)
-        font_match = ImageFont.truetype("arial.ttf", 60)  # Doublé (anciennement 30)
+        font_title = ImageFont.truetype(font_path, 64) # Gros titre lisible
+        font_match = ImageFont.truetype(font_match_path := font_path, 34) # Noms d'équipes bien visibles
     except:
         font_title = ImageFont.load_default()
         font_match = ImageFont.load_default()
         
-    # En-tête : MATCHDAY 1 en taille XXL
-    draw.text((W/2, 210), "MATCHDAY 1", fill="#d4af37", anchor="mm", font=font_title)
+    # En-tête : MATCHDAY 1
+    draw.text((W/2, 185), "MATCHDAY 1", fill="#d4af37", anchor="mm", font=font_title)
     
     # --- INSERTION DES CARTES DE MATCHS ---
-    start_y = 280
-    row_height = 145
+    start_y = 235
+    row_height = 150
     
     for i, (team_a, team_b, logo1_url, logo2_url) in enumerate(final_fixtures_with_logos):
         y = start_y + (i * row_height)
         
         # Fond de la carte de match
-        draw.rectangle([70, y, W-70, y + 130], fill="#0d1930", outline="#d4af37", width=2)
+        draw.rectangle([70, y, W-70, y + 132], fill="#0d1930", outline="#d4af37", width=2)
         
         if logo1_url and not logo1_url.startswith("http"):
             logo1_url = base_url + logo1_url
@@ -153,8 +155,8 @@ async def generate_fixtures_graphic():
             try:
                 response = requests.get(logo1_url, timeout=5)
                 logo_img = Image.open(BytesIO(response.content)).convert("RGBA")
-                logo_img = logo_img.resize((65, 65), Image.Resampling.LANCZOS)
-                img.paste(logo_img, (95, y + 32), logo_img)
+                logo_img = logo_img.resize((70, 70), Image.Resampling.LANCZOS)
+                img.paste(logo_img, (95, y + 31), logo_img)
             except Exception as e:
                 print(f"Erreur logo 1: {e}")
                 
@@ -163,19 +165,19 @@ async def generate_fixtures_graphic():
             try:
                 response = requests.get(logo2_url, timeout=5)
                 logo_img = Image.open(BytesIO(response.content)).convert("RGBA")
-                logo_img = logo_img.resize((65, 65), Image.Resampling.LANCZOS)
-                img.paste(logo_img, (W - 160, y + 32), logo_img)
+                logo_img = logo_img.resize((70, 70), Image.Resampling.LANCZOS)
+                img.paste(logo_img, (W - 165, y + 31), logo_img)
             except Exception as e:
                 print(f"Erreur logo 2: {e}")
 
-        # Noms des équipes (agrandis x2) et VS
-        draw.text((180, y + 65), team_a.upper()[:10], fill="#ffffff", anchor="lm", font=font_match)
-        draw.text((W/2, y + 65), "VS", fill="#00b4db", anchor="mm", font=font_match)
-        draw.text((W - 180, y + 65), team_b.upper()[:10], fill="#ffffff", anchor="rm", font=font_match)
+        # Noms des équipes et VS
+        draw.text((185, y + 66), team_a.upper()[:12], fill="#ffffff", anchor="lm", font=font_match)
+        draw.text((W/2, y + 66), "VS", fill="#00b4db", anchor="mm", font=font_match)
+        draw.text((W - 185, y + 66), team_b.upper()[:12], fill="#ffffff", anchor="rm", font=font_match)
         
     output_path = "instagram_post.png"
     img.save(output_path)
-    print(f"🎨 Affiche XXL générée avec succès : {output_path}")
+    print(f"🎨 Affiche avec vraie police HD générée avec succès : {output_path}")
 
 if __name__ == "__main__":
     asyncio.run(generate_fixtures_graphic())
