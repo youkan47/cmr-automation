@@ -14,7 +14,16 @@ async def generate_fixtures_graphic():
     
     competition_logo_url = "https://zone212.cmrankings.com/tenancy/assets/competitions/logos/competition-21-ed4d38e3-a842-4c11-9d00-79b94db30ed7.webp"
     
-    print(f"🚀 [Pro Design Linux Font] Connexion au classement pour récupérer les logos...")
+    # Téléchargement d'une police bold moderne et épurée (Roboto Bold) depuis Google Fonts
+    font_path = "EditorialFont.ttf"
+    if not os.path.exists(font_path):
+        print("📥 Téléchargement de la police éditoriale moderne...")
+        ttf_url = "https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Bold.ttf"
+        r = requests.get(ttf_url)
+        with open(font_path, "wb") as f:
+            f.write(r.content)
+
+    print(f"🚀 [Editorial Pro] Connexion au classement pour récupérer les logos...")
     
     team_logos = {}
     extracted_fixtures = []
@@ -104,80 +113,78 @@ async def generate_fixtures_graphic():
         logo2 = team_logos.get(t2.upper(), "")
         final_fixtures_with_logos.append((t1, t2, logo1, logo2))
 
-    # --- CRÉATION DE L'AFFICHE HD CARRÉE (1080x1080) ---
+    # --- CRÉATION DE L'AFFICHE ÉDITORIALE CARRÉE (1080x1080) ---
     W, H = 1080, 1080
-    img = Image.new("RGB", (W, H), color="#050913")
+    img = Image.new("RGB", (W, H), color="#03060a") # Noir carbone ultra-propre
     draw = ImageDraw.Draw(img)
     
-    # Cadre esport premium (Or et Bleu)
-    draw.rectangle([30, 30, W-30, H-30], outline="#d4af37", width=4)
-    draw.rectangle([38, 38, W-38, H-38], outline="#00b4db", width=2)
+    # Bordures fines et élégantes inspirées du style éditorial
+    draw.rectangle([30, 30, W-30, H-30], outline="#1e293b", width=2)
+    draw.line([(50, 160), (W - 50, 160)], fill="#00b4db", width=2) # Ligne de accent néon cyan
     
     # Logo de la compétition centré en haut
     if competition_logo_url:
         try:
             res = requests.get(competition_logo_url, timeout=5)
             comp_logo = Image.open(BytesIO(res.content)).convert("RGBA")
-            comp_logo = comp_logo.resize((120, 120), Image.Resampling.LANCZOS)
-            img.paste(comp_logo, (W//2 - 60, 42), comp_logo)
+            comp_logo = comp_logo.resize((90, 90), Image.Resampling.LANCZOS)
+            img.paste(comp_logo, (W//2 - 45, 45), comp_logo)
         except Exception as e:
             print(f"Erreur chargement logo compétition : {e}")
 
-    # Utilisation d'une police Linux standard (DejaVu Sans Bold) garantie sur GitHub Actions
-    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
     try:
-        font_title = ImageFont.truetype(font_path, 64) # Gros titre lisible
-        font_match = ImageFont.truetype(font_match_path := font_path, 34) # Noms d'équipes bien visibles
+        font_title = ImageFont.truetype(font_path, 48) # Titre éditorial épuré et large
+        font_match = ImageFont.truetype(font_path, 32) # Noms d'équipes bold et lisibles
     except:
         font_title = ImageFont.load_default()
         font_match = ImageFont.load_default()
         
-    # En-tête : MATCHDAY 1
-    draw.text((W/2, 185), "MATCHDAY 1", fill="#d4af37", anchor="mm", font=font_title)
+    # En-tête : MATCHDAY 1 (Style minimaliste / éditorial)
+    draw.text((W/2, 215), "MATCHDAY 1", fill="#ffffff", anchor="mm", font=font_title)
     
-    # --- INSERTION DES CARTES DE MATCHS ---
-    start_y = 235
-    row_height = 150
+    # --- INSERTION DES CARTES DE MATCHS STYLE ÉDITORIAL ---
+    start_y = 280
+    row_height = 145
     
     for i, (team_a, team_b, logo1_url, logo2_url) in enumerate(final_fixtures_with_logos):
         y = start_y + (i * row_height)
         
-        # Fond de la carte de match
-        draw.rectangle([70, y, W-70, y + 132], fill="#0d1930", outline="#d4af37", width=2)
+        # Carte de match sombre avec une bordure subtile
+        draw.rectangle([70, y, W-70, y + 125], fill="#0b1325", outline="#1e293b", width=1)
         
         if logo1_url and not logo1_url.startswith("http"):
             logo1_url = base_url + logo1_url
         if logo2_url and not logo2_url.startswith("http"):
             logo2_url = base_url + logo2_url
 
-        # Insertion Logo Équipe 1
+        # Insertion Logo Équipe 1 (60x60)
         if logo1_url:
             try:
                 response = requests.get(logo1_url, timeout=5)
                 logo_img = Image.open(BytesIO(response.content)).convert("RGBA")
-                logo_img = logo_img.resize((70, 70), Image.Resampling.LANCZOS)
-                img.paste(logo_img, (95, y + 31), logo_img)
+                logo_img = logo_img.resize((60, 60), Image.Resampling.LANCZOS)
+                img.paste(logo_img, (100, y + 32), logo_img)
             except Exception as e:
                 print(f"Erreur logo 1: {e}")
                 
-        # Insertion Logo Équipe 2
+        # Insertion Logo Équipe 2 (60x60)
         if logo2_url:
             try:
                 response = requests.get(logo2_url, timeout=5)
                 logo_img = Image.open(BytesIO(response.content)).convert("RGBA")
-                logo_img = logo_img.resize((70, 70), Image.Resampling.LANCZOS)
-                img.paste(logo_img, (W - 165, y + 31), logo_img)
+                logo_img = logo_img.resize((60, 60), Image.Resampling.LANCZOS)
+                img.paste(logo_img, (W - 160, y + 32), logo_img)
             except Exception as e:
                 print(f"Erreur logo 2: {e}")
 
-        # Noms des équipes et VS
-        draw.text((185, y + 66), team_a.upper()[:12], fill="#ffffff", anchor="lm", font=font_match)
-        draw.text((W/2, y + 66), "VS", fill="#00b4db", anchor="mm", font=font_match)
-        draw.text((W - 185, y + 66), team_b.upper()[:12], fill="#ffffff", anchor="rm", font=font_match)
+        # Noms des équipes & Séparateur VS minimaliste
+        draw.text((180, y + 62), team_a.upper()[:14], fill="#f8fafc", anchor="lm", font=font_match)
+        draw.text((W/2, y + 62), "VS", fill="#00b4db", anchor="mm", font=font_match)
+        draw.text((W - 180, y + 62), team_b.upper()[:14], fill="#f8fafc", anchor="rm", font=font_match)
         
     output_path = "instagram_post.png"
     img.save(output_path)
-    print(f"🎨 Affiche avec vraie police HD générée avec succès : {output_path}")
+    print(f"🎨 Affiche éditoriale générée avec succès : {output_path}")
 
 if __name__ == "__main__":
     asyncio.run(generate_fixtures_graphic())
