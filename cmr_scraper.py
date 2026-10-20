@@ -12,7 +12,7 @@ async def generate_fixtures_graphic():
     standings_url = f"{base_url}/competition/21?tab=standings"
     fixtures_url = f"{base_url}/competition/21?tab=fixtures"
     
-    print(f"🚀 [Pro Fix Boucle & XXL] Récupération des logos et des matchs...")
+    print(f"🚀 [Pro Taille Doublée XXL] Récupération des logos et des matchs...")
     
     team_logos = {}
     extracted_fixtures = []
@@ -98,14 +98,15 @@ async def generate_fixtures_graphic():
         logo2 = team_logos.get(t2.upper(), "")
         final_fixtures_with_logos.append((t1, t2, logo1, logo2))
 
-    # --- CHARGEMENT DU MASTER BACKGROUND (IMG_0847.jpeg) ---
+    # --- CHARGEMENT ET REDIMENSIONNEMENT DU MASTER BACKGROUND À 1080x1080 ---
     bg_path = "IMG_0847.jpeg"
     if os.path.exists(bg_path):
         img = Image.open(bg_path).convert("RGB")
-        print("✅ IMG_0847.jpeg chargé avec succès !")
+        img = img.resize((1080, 1080), Image.Resampling.LANCZOS)
+        print("✅ IMG_0847.jpeg chargé et normalisé en 1080x1080 avec succès !")
     else:
-        print("⚠️ IMG_0847.jpeg introuvable, création d'un fond de secours 2000x2000.")
-        img = Image.new("RGB", (2000, 2000), color="#050913")
+        print("⚠️ IMG_0847.jpeg introuvable, création d'un fond de secours 1080x1080.")
+        img = Image.new("RGB", (1080, 1080), color="#050913")
         
     W, H = img.size
     draw = ImageDraw.Draw(img)
@@ -118,46 +119,41 @@ async def generate_fixtures_graphic():
         with open(font_path, "wb") as f:
             f.write(r.content)
 
-    # TAILLES XXL
-    title_font_size = int(W * 0.08)   # 8% de la largeur pour le titre
-    match_font_size = int(W * 0.038)  # 3.8% pour les équipes (très grand et visible)
-
+    # TAILLES DOUBLÉES (Titre 130px, Équipes 68px)
     try:
-        font_title = ImageFont.truetype(font_path, title_font_size)
-        font_match = ImageFont.truetype(font_path, match_font_size)
+        font_title = ImageFont.truetype(font_path, 130)  
+        font_match = ImageFont.truetype(font_path, 68)  
     except:
         font_title = ImageFont.load_default()
         font_match = ImageFont.load_default()
         
-    # Titre "MATCHDAY 1"
+    # Titre "MATCHDAY 1" positionné sous le logo
     title_text = "MATCHDAY 1"
-    title_y = int(H * 0.22)
-    draw.text((W/2 + 6, title_y + 6), title_text, fill="#000000", anchor="mm", font=font_title)
+    title_y = 195
+    draw.text((W/2 + 4, title_y + 4), title_text, fill="#000000", anchor="mm", font=font_title)
     draw.text((W/2, title_y), title_text, fill="#F3C653", anchor="mm", font=font_title)
     
-    # --- INSERTION DES LIGNES DE MATCHS (Boucle corrigée sur final_fixtures_with_logos) ---
-    start_y = int(H * 0.30)
-    available_height = H * 0.63
-    row_height = int(available_height / 5)
-    bar_height = int(row_height * 0.80)
-    
-    margin_x = int(W * 0.06)
+    # --- INSERTION DES LIGNES DE MATCHS (Grandes tailles doublées) ---
+    start_y = 250
+    row_height = 145
+    bar_height = 115
+    margin_x = 75
     
     for i, (team_a, team_b, logo1_url, logo2_url) in enumerate(final_fixtures_with_logos):
         y = start_y + (i * row_height)
         
         # Bandeau de match semi-transparent
-        draw.rectangle([margin_x, y, W - margin_x, y + bar_height], fill=(8, 18, 38, 235), outline=(212, 175, 55, 160), width=3)
+        draw.rectangle([margin_x, y, W - margin_x, y + bar_height], fill=(8, 18, 38, 235), outline=(212, 175, 55, 160), width=2)
         
         # Ligne lumineuse dorée sous chaque match
-        draw.line([(margin_x + 15, y + bar_height), (W - margin_x - 15, y + bar_height)], fill="#E5B84B", width=4)
+        draw.line([(margin_x + 15, y + bar_height), (W - margin_x - 15, y + bar_height)], fill="#E5B84B", width=3)
         
         if logo1_url and not logo1_url.startswith("http"):
             logo1_url = base_url + logo1_url
         if logo2_url and not logo2_url.startswith("http"):
             logo2_url = base_url + logo2_url
 
-        logo_size = int(bar_height * 0.75)
+        logo_size = 85  # Logos agrandis pour s'harmoniser avec les textes doublés
         logo_y = y + (bar_height - logo_size) // 2
 
         # Insertion Logo Équipe 1
@@ -166,7 +162,7 @@ async def generate_fixtures_graphic():
                 response = requests.get(logo1_url, timeout=5)
                 logo_img = Image.open(BytesIO(response.content)).convert("RGBA")
                 logo_img = logo_img.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
-                img.paste(logo_img, (margin_x + int(40), logo_y), logo_img)
+                img.paste(logo_img, (margin_x + 30, logo_y), logo_img)
             except Exception as e:
                 print(f"Erreur logo 1: {e}")
                 
@@ -176,18 +172,18 @@ async def generate_fixtures_graphic():
                 response = requests.get(logo2_url, timeout=5)
                 logo_img = Image.open(BytesIO(response.content)).convert("RGBA")
                 logo_img = logo_img.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
-                img.paste(logo_img, (W - margin_x - int(40) - logo_size, logo_y), logo_img)
+                img.paste(logo_img, (W - margin_x - 30 - logo_size, logo_y), logo_img)
             except Exception as e:
                 print(f"Erreur logo 2: {e}")
 
-        # Noms des équipes en format XXL
+        # Noms des équipes en format géant (doublé)
         text_y = y + bar_height / 2
-        draw.text((margin_x + logo_size + int(65), text_y), team_a.upper()[:14], fill="#FFFFFF", anchor="lm", font=font_match)
-        draw.text((W - margin_x - logo_size - int(65), text_y), team_b.upper()[:14], fill="#FFFFFF", anchor="rm", font=font_match)
+        draw.text((margin_x + logo_size + 50, text_y), team_a.upper()[:12], fill="#FFFFFF", anchor="lm", font=font_match)
+        draw.text((W - margin_x - logo_size - 50, text_y), team_b.upper()[:12], fill="#FFFFFF", anchor="rm", font=font_match)
         
     output_path = "instagram_post.png"
     img.save(output_path)
-    print(f"🎨 Affiche XXL corrigée générée avec succès : {output_path}")
+    print(f"🎨 Affiche XXL doublée générée avec succès : {output_path}")
 
 if __name__ == "__main__":
     asyncio.run(generate_fixtures_graphic())
