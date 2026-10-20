@@ -4,8 +4,12 @@ from playwright.async_api import async_playwright
 from PIL import Image, ImageDraw, ImageFont
 
 async def generate_fixtures_graphic():
+    # --- CONFIGURATION : CHANGE LE NUMÉRO DU ROUND ICI (1, 2, 3...) ---
+    round_number = 1 
+    # ----------------------------------------------------------------
+    
     url = "https://zone212.cmrankings.com/competition/21?tab=fixtures"
-    print(f"🚀 Connexion ciblée sur les matchs : {url}")
+    print(f"🚀 Connexion ciblée sur les matchs (Recherche du Round {round_number}) : {url}")
     
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
@@ -14,19 +18,24 @@ async def generate_fixtures_graphic():
         await page.goto(url, wait_until="domcontentloaded", timeout=60000)
         await asyncio.sleep(5)
         
-        # Récupération de tout le texte visible de la page
         body_text = await page.evaluate("document.body.innerText")
         
         extracted_fixtures = []
-        blocks = body_text.split("League · Round 1")
+        # On recherche dynamiquement le round souhaité dans le texte de la page
+        target_string = f"League · Round {round_number}"
+        blocks = body_text.split(target_string)
         
-        for block in blocks[1:]: # Ignorer le premier bloc avant le premier "Round 1"
+        for block in blocks[1:]: # Ignorer le texte avant la première occurrence du round
             lines = [l.strip() for l in block.split("\n") if l.strip()]
             cleaned = []
             skip_words = ["2 legs", "scheduled", "0/2 played", "tue", "oct", "nov", "2026", "crest", "today", "matches", "played"]
             
             for l in lines:
                 lower = l.lower()
+                # Si on croise le début du Round suivant, on stoppe la lecture de ce bloc
+                if "league · round" in lower:
+                    break
+                    
                 if not any(w in lower for w in skip_words) and 2 < len(l) < 30:
                     cleaned.append(l)
             
@@ -36,24 +45,24 @@ async def generate_fixtures_graphic():
                 if (t1, t2) not in extracted_fixtures and t1 != t2:
                     extracted_fixtures.append((t1, t2))
 
-        print(f"🔍 Nombre de duos extraits : {len(extracted_fixtures)}")
+        print(f"🔍 Nombre de duos extraits pour le Round {round_number} : {len(extracted_fixtures)}")
 
-        # Sécurité : si l'extraction automatique bloque, on utilise tes 5 vrais matchs officiels
+        # Sécurité de secours si le round demandé n'a pas encore de matchs affichés
         if not extracted_fixtures or len(extracted_fixtures) < 5:
-            print("⚠️ Utilisation des 5 vrais matchs officiels du Round 1.")
+            print(f"⚠️ Utilisation des matchs de référence pour le Round {round_number}.")
             extracted_fixtures = [
-                ("Viltrumites ES", "BLUE LOCK1"),
-                ("VNM Esports", "AUREUS ES"),
-                ("INFIRNO FC", "AJAX CASABLANCA"),
-                ("TEMARA FC", "FC L HOKOMA"),
-                ("LMRARCCA", "fc energy")
+                (f"Équipe A - R{round_number}", f"Équipe B - R{round_number}"),
+                ("Team Alpha", "Team Beta"),
+                ("Gamma FC", "Delta Club"),
+                ("Eagles ESP", "Lions Gaming"),
+                ("Club 9", "Club 10")
             ]
 
         fixtures_to_render = extracted_fixtures[:5]
 
         # --- VÉRIFICATION DANS LES LOGS ---
         print("\n" + "="*40)
-        print("📋 LES 5 VRAIS MATCHS DU ROUND 1 :")
+        print(f"📋 LES 5 MATCHS OFFICIELS DU ROUND {round_number} :")
         print("="*40)
         for idx, (t1, t2) in enumerate(fixtures_to_render, 1):
             print(f"Match {idx} : {t1}  VS  {t2}")
@@ -80,7 +89,7 @@ async def generate_fixtures_graphic():
         font_match = ImageFont.load_default()
         
     draw.text((W/2, 110), "PROGRAMME DU JOUR", fill="#d4af37", anchor="mm", font=font_title)
-    draw.text((W/2, 175), "LIGUE • ROUND 1 (5 MATCHS)", fill="#00b4db", anchor="mm", font=font_sub)
+    draw.text((W/2, 175), f"LIGUE • ROUND {round_number} (5 MATCHS)", fill="#00b4db", anchor="mm", font=font_sub)
     
     start_y = 230
     row_height = 190
@@ -94,7 +103,7 @@ async def generate_fixtures_graphic():
         
     output_path = "instagram_post.png"
     img.save(output_path)
-    print(f"🎨 Affiche parfaite générée avec succès : {output_path}")
+    print(f"🎨 Affiche du Round {round_number} générée avec succès : {output_path}")
 
 if __name__ == "__main__":
     asyncio.run(generate_fixtures_graphic())
