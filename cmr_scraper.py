@@ -12,7 +12,7 @@ async def generate_fixtures_graphic():
     standings_url = f"{base_url}/competition/21?tab=standings"
     fixtures_url = f"{base_url}/competition/21?tab=fixtures"
     
-    print(f"🚀 [Pro Broadcast Design] Récupération des logos et des matchs...")
+    print(f"🚀 [Pro Layout Fix] Récupération des logos et des matchs...")
     
     team_logos = {}
     extracted_fixtures = []
@@ -98,7 +98,7 @@ async def generate_fixtures_graphic():
         logo2 = team_logos.get(t2.upper(), "")
         final_fixtures_with_logos.append((t1, t2, logo1, logo2))
 
-    # --- CHARGEMENT DE VOTRE MASTER BACKGROUND (IMG_0847.jpeg) ---
+    # --- CHARGEMENT DU MASTER BACKGROUND (IMG_0847.jpeg) ---
     bg_path = "IMG_0847.jpeg"
     if os.path.exists(bg_path):
         img = Image.open(bg_path).convert("RGB")
@@ -110,7 +110,7 @@ async def generate_fixtures_graphic():
     W, H = img.size
     draw = ImageDraw.Draw(img)
 
-    # Téléchargement d'une police bold moderne et percutante
+    # Téléchargement d'une police bold propre pour le rendu Linux
     font_path = "BroadcastFont.ttf"
     if not os.path.exists(font_path):
         ttf_url = "https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Bold.ttf"
@@ -119,44 +119,44 @@ async def generate_fixtures_graphic():
             f.write(r.content)
 
     try:
-        font_title = ImageFont.truetype(font_path, 72)
-        font_match = ImageFont.truetype(font_path, 34)
-        font_vs = ImageFont.truetype(font_path, 28)
+        font_title = ImageFont.truetype(font_path, 58)  # Titre bien proportionné sous le logo
+        font_match = ImageFont.truetype(font_path, 30)  # Noms d'équipes lisibles
+        font_vs = ImageFont.truetype(font_path, 24)     # VS central
     except:
         font_title = ImageFont.load_default()
         font_match = ImageFont.load_default()
         font_vs = ImageFont.load_default()
         
-    # Titre "MATCHDAY 1" avec effet d'ombre portée et couleur or brillant
+    # Titre "MATCHDAY 1" centré sous le logo CMR de l'image de fond
     title_text = "MATCHDAY 1"
-    draw.text((W/2 + 3, 208), title_text, fill="#000000", anchor="mm", font=font_title)
-    draw.text((W/2, 205), title_text, fill="#F3C653", anchor="mm", font=font_title)
+    draw.text((W/2 + 2, 192), title_text, fill="#000000", anchor="mm", font=font_title)
+    draw.text((W/2, 190), title_text, fill="#F3C653", anchor="mm", font=font_title) # Or brillant
     
-    # --- INSERTION DES LIGNES DE MATCHS ---
-    start_y = 280
-    row_height = 138
+    # --- INSERTION DES LIGNES DE MATCHS (Positionnement parfait) ---
+    start_y = 260
+    row_height = 115
     
     for i, (team_a, team_b, logo1_url, logo2_url) in enumerate(final_fixtures_with_logos):
         y = start_y + (i * row_height)
         
-        # Bandeau de match semi-transparent élégant
-        draw.rectangle([75, y, W-75, y + 115], fill=(8, 18, 38, 220), outline=(212, 175, 55, 120), width=1)
+        # Bandeau de match semi-transparent élégant (largeur bien ajustée aux marges)
+        draw.rectangle([85, y, W-85, y + 98], fill=(8, 18, 38, 230), outline=(212, 175, 55, 140), width=1)
         
         # Ligne lumineuse dorée sous chaque match
-        draw.line([(85, y + 115), (W - 85, y + 115)], fill="#E5B84B", width=2)
+        draw.line([(95, y + 98), (W - 95, y + 98)], fill="#E5B84B", width=2)
         
         if logo1_url and not logo1_url.startswith("http"):
             logo1_url = base_url + logo1_url
         if logo2_url and not logo2_url.startswith("http"):
             logo2_url = base_url + logo2_url
 
-        # Insertion Logo Équipe 1
+        # Insertion Logo Équipe 1 (Taille optimisée : 56x56)
         if logo1_url:
             try:
                 response = requests.get(logo1_url, timeout=5)
                 logo_img = Image.open(BytesIO(response.content)).convert("RGBA")
-                logo_img = logo_img.resize((68, 68), Image.Resampling.LANCZOS)
-                img.paste(logo_img, (105, y + 23), logo_img)
+                logo_img = logo_img.resize((56, 56), Image.Resampling.LANCZOS)
+                img.paste(logo_img, (115, y + 21), logo_img)
             except Exception as e:
                 print(f"Erreur logo 1: {e}")
                 
@@ -165,25 +165,25 @@ async def generate_fixtures_graphic():
             try:
                 response = requests.get(logo2_url, timeout=5)
                 logo_img = Image.open(BytesIO(response.content)).convert("RGBA")
-                logo_img = logo_img.resize((68, 68), Image.Resampling.LANCZOS)
-                img.paste(logo_img, (W - 173, y + 23), logo_img)
+                logo_img = logo_img.resize((56, 56), Image.Resampling.LANCZOS)
+                img.paste(logo_img, (W - 171, y + 21), logo_img)
             except Exception as e:
                 print(f"Erreur logo 2: {e}")
 
         # Badge "VS" central en cyan néon
-        vs_box_w, vs_box_h = 56, 36
+        vs_box_w, vs_box_h = 46, 30
         vs_x = W // 2 - vs_box_w // 2
-        vs_y = y + 40
+        vs_y = y + 34
         draw.rectangle([vs_x, vs_y, vs_x + vs_box_w, vs_y + vs_box_h], fill="#03060A", outline="#00B4DB", width=2)
-        draw.text((W/2, y + 58), "VS", fill="#00B4DB", anchor="mm", font=font_vs)
+        draw.text((W/2, y + 49), "VS", fill="#00B4DB", anchor="mm", font=font_vs)
 
-        # Noms des équipes
-        draw.text((195, y + 58), team_a.upper()[:13], fill="#FFFFFF", anchor="lm", font=font_match)
-        draw.text((W - 195, y + 58), team_b.upper()[:13], fill="#FFFFFF", anchor="rm", font=font_match)
+        # Noms des équipes parfaitement alignés
+        draw.text((190, y + 49), team_a.upper()[:14], fill="#FFFFFF", anchor="lm", font=font_match)
+        draw.text((W - 190, y + 49), team_b.upper()[:14], fill="#FFFFFF", anchor="rm", font=font_match)
         
     output_path = "instagram_post.png"
     img.save(output_path)
-    print(f"🎨 Affiche broadcast générée avec succès à partir de IMG_0847.jpeg : {output_path}")
+    print(f"🎨 Affiche corrigée et alignée générée avec succès : {output_path}")
 
 if __name__ == "__main__":
     asyncio.run(generate_fixtures_graphic())
