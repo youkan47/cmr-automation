@@ -14,45 +14,31 @@ async def generate_fixtures_graphic():
         await page.goto(url, wait_until="domcontentloaded", timeout=60000)
         await asyncio.sleep(5)
         
-        # Extraction précise basée sur la structure exacte que tu as partagée
-        extracted_fixtures = await page.evaluate("""() => {
-            const fixtures = [];
-            const textContent = document.body.innerText;
+        # Récupération de tout le texte visible de la page
+        body_text = await page.evaluate("document.body.innerText")
+        
+        extracted_fixtures = []
+        blocks = body_text.split("League · Round 1")
+        
+        for block in blocks[1:]: # Ignorer le premier bloc avant le premier "Round 1"
+            lines = [l.strip() for l in block.split("\n") if l.strip()]
+            cleaned = []
+            skip_words = ["2 legs", "scheduled", "0/2 played", "tue", "oct", "nov", "2026", "crest", "today", "matches", "played"]
             
-            // On cherche à découper par les blocs "League · Round 1"
-            const blocks = textContent.split('League · Round 1');
+            for l in lines:
+                lower = l.lower()
+                if not any(w in lower for w in skip_words) and 2 < len(l) < 30:
+                    cleaned.append(l)
             
-            blocks.forEach(block => {
-                const lines = block.split('\\n').map(l => l.trim()).filter(l => l.length > 0);
-                
-                // Dans ton texte type, les équipes se trouvent autour de "0/2 played" ou avant/après les mots "SCHEDULED" / "crest"
-                // On filtre les lignes pour trouver les vrais noms d'équipes
-                const cleanedLines = [];
-                const skipWords = ['2 legs', 'scheduled', '0/2 played', 'tue', 'oct', 'nov', '2026', 'crest', 'today', 'matches'];
-                
-                for (let l of lines) {
-                    const lower = l.toLowerCase();
-                    if (!skipWords.some(w => lower.includes(w)) && l.length > 2 && l.length < 30) {
-                        cleanedLines.push(l);
-                    }
-                }
-                
-                // Si on a au moins 2 équipes valides dans ce bloc de round 1
-                if (cleanedLines.length >= 2) {
-                    const t1 = cleanedLines[0];
-                    const t2 = cleanedLines[1];
-                    if (!fixtures.some(f => f[0] === t1 && f[1] === t2) && t1 !== t2) {
-                        fixtures.push([t1, t2]);
-                    }
-                }
-            });
-            
-            return fixtures;
-        """)
+            if len(cleaned) >= 2:
+                t1 = cleaned[0]
+                t2 = cleaned[1]
+                if (t1, t2) not in extracted_fixtures and t1 != t2:
+                    extracted_fixtures.append((t1, t2))
 
         print(f"🔍 Nombre de duos extraits : {len(extracted_fixtures)}")
 
-        # Si le scraping automatique a un souci, on intègre directement tes 5 vrais matchs exacts
+        # Sécurité : si l'extraction automatique bloque, on utilise tes 5 vrais matchs officiels
         if not extracted_fixtures or len(extracted_fixtures) < 5:
             print("⚠️ Utilisation des 5 vrais matchs officiels du Round 1.")
             extracted_fixtures = [
