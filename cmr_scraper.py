@@ -2,14 +2,18 @@ import asyncio
 import os
 from playwright.async_api import async_playwright
 from PIL import Image, ImageDraw, ImageFont
+import requests
+from io import BytesIO
 
 async def generate_fixtures_graphic():
-    # --- CONFIGURATION : CHANGE LE NUMÉRO DU ROUND ICI (1, 2, 3...) ---
-    round_number = 2
-    # ----------------------------------------------------------------
+    # --- CONFIGURATION : CHANGE LE NUMÉRO DU ROUND ICI ---
+    round_number = 1 
+    # ----------------------------------------------------
     
     url = "https://zone212.cmrankings.com/competition/21?tab=fixtures"
     print(f"🚀 Connexion ciblée sur les matchs (Recherche du Round {round_number}) : {url}")
+    
+    extracted_fixtures = []
     
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
@@ -18,57 +22,68 @@ async def generate_fixtures_graphic():
         await page.goto(url, wait_until="domcontentloaded", timeout=60000)
         await asyncio.sleep(5)
         
-        body_text = await page.evaluate("document.body.innerText")
-        
-        extracted_fixtures = []
-        # On recherche dynamiquement le round souhaité dans le texte de la page
-        target_string = f"League · Round {round_number}"
-        blocks = body_text.split(target_string)
-        
-        for block in blocks[1:]: # Ignorer le texte avant la première occurrence du round
-            lines = [l.strip() for l in block.split("\n") if l.strip()]
-            cleaned = []
-            skip_words = ["2 legs", "scheduled", "0/2 played", "tue", "oct", "nov", "2026", "crest", "today", "matches", "played"]
+        # Extraction intelligente via JavaScript pour récupérer les équipes et les URLs des logos associés
+        extracted_fixtures = await page.evaluate(f"""() => {{
+            const fixtures = [];
+            const targetText = 'League · Round {round_number}';
             
-            for l in lines:
-                lower = l.lower()
-                # Si on croise le début du Round suivant, on stoppe la lecture de ce bloc
-                if "league · round" in lower:
-                    break
+            // On cherche tous les éléments de la page pour repérer les cartes du round
+            const divs = document.querySelectorAll('div');
+            divs.forEach(card => {{
+                const text = card.innerText;
+                if (text && text.includes(targetText) && (text.includes('SCHEDULED') || text.includes('0/2 played'))) {{
+                    const lines = text.split('\\n').map(l => l.trim()).filter(l => l.length > 0);
+                    const cleaned = [];
+                    const skipWords = ['2 legs', 'scheduled', '0/2 played', 'tue', 'oct', 'nov', '2026', 'crest', 'today', 'matches', 'played', 'league', 'round', '{round_number}'];
                     
-                if not any(w in lower for w in skip_words) and 2 < len(l) < 30:
-                    cleaned.append(l)
-            
-            if len(cleaned) >= 2:
-                t1 = cleaned[0]
-                t2 = cleaned[1]
-                if (t1, t2) not in extracted_fixtures and t1 != t2:
-                    extracted_fixtures.append((t1, t2))
+                    for (let l of lines) {
+                        const lower = l.toLowerCase();
+                        if (!skipWords.some(w => lower.includes(w)) && l.length > 2 && l.length < 30) {
+                            cleaned.push(l);
+                        }
+                    }
+                    
+                    if (cleaned.length >= 2) {{
+                        const t1 = cleaned[0];
+                        const t2 = cleaned[1];
+                        
+                        // Récupérer les liens des logos (balises img) à l'intérieur de la carte
+                        const imgs = card.querySelectorAll('img');
+                        let logo1 = imgs.length > 0 ? imgs[0].src : '';
+                        let logo2 = imgs.length > 1 ? imgs[1].src : '';
+                        
+                        if (!fixtures.some(f => f[0] === t1 && f[1] === t2) && t1 !== t2) {{
+                            fixtures.push([t1, t2, logo1, logo2]);
+                        }}
+                    }}
+                }}
+            }});
+            return fixtures;
+        }}""")
 
-        print(f"🔍 Nombre de duos extraits pour le Round {round_number} : {len(extracted_fixtures)}")
-
-        # Sécurité de secours si le round demandé n'a pas encore de matchs affichés
-        if not extracted_fixtures or len(extracted_fixtures) < 5:
-            print(f"⚠️ Utilisation des matchs de référence pour le Round {round_number}.")
-            extracted_fixtures = [
-                (f"Équipe A - R{round_number}", f"Équipe B - R{round_number}"),
-                ("Team Alpha", "Team Beta"),
-                ("Gamma FC", "Delta Club"),
-                ("Eagles ESP", "Lions Gaming"),
-                ("Club 9", "Club 10")
-            ]
-
-        fixtures_to_render = extracted_fixtures[:5]
-
-        # --- VÉRIFICATION DANS LES LOGS ---
-        print("\n" + "="*40)
-        print(f"📋 LES 5 MATCHS OFFICIELS DU ROUND {round_number} :")
-        print("="*40)
-        for idx, (t1, t2) in enumerate(fixtures_to_render, 1):
-            print(f"Match {idx} : {t1}  VS  {t2}")
-        print("="*40 + "\n")
-
+        print(f"🔍 Nombre de duos avec logos extraits : {len(extracted_fixtures)}")
         await browser.close()
+
+    # Sécurité de secours si le scraping dynamique manque d'éléments
+    if not extracted_fixtures or len(extracted_fixtures) < 5:
+        print(f"⚠️ Utilisation des données de secours pour le Round {round_number}.")
+        extracted_fixtures = [
+            ("Viltrumites ES", "BLUE LOCK1", "", ""),
+            ("VNM Esports", "AUREUS ES", "", ""),
+            ("INFIRNO FC", "AJAX CASABLANCA", "", ""),
+            ("TEMARA FC", "FC L HOKOMA", "", ""),
+            ("LMRARCCA", "fc energy", "", "")
+        ]
+
+    fixtures_to_render = extracted_fixtures[:5]
+
+    # --- VÉRIFICATION DANS LES LOGS ---
+    print("\n" + "="*40)
+    print(f"📋 LES 5 MATCHS OFFICIELS DU ROUND {round_number} :")
+    print("="*40)
+    for idx, match in enumerate(fixtures_to_render, 1):
+        print(f"Match {idx} : {match[0]}  VS  {match[1]}")
+    print("="*40 + "\n")
 
     # --- CRÉATION DE L'AFFICHE INSTAGRAM (1080x1350) ---
     W, H = 1080, 1350
@@ -82,7 +97,7 @@ async def generate_fixtures_graphic():
     try:
         font_title = ImageFont.truetype("arial.ttf", 55)
         font_sub = ImageFont.truetype("arial.ttf", 30)
-        font_match = ImageFont.truetype("arial.ttf", 28)
+        font_match = ImageFont.truetype("arial.ttf", 26)
     except:
         font_title = ImageFont.load_default()
         font_sub = ImageFont.load_default()
@@ -94,16 +109,40 @@ async def generate_fixtures_graphic():
     start_y = 230
     row_height = 190
     
-    for i, (team_a, team_b) in enumerate(fixtures_to_render):
+    for i, (team_a, team_b, logo1_url, logo2_url) in enumerate(fixtures_to_render):
         y = start_y + (i * row_height)
+        
+        # Fond de la carte de match
         draw.rectangle([80, y, W-80, y + 160], fill="#0d1930", outline="#d4af37", width=2)
-        draw.text((160, y + 80), team_a.upper()[:18], fill="#ffffff", anchor="lm", font=font_match)
+        
+        # Téléchargement et insertion du Logo Équipe 1 (à gauche)
+        if logo1_url:
+            try:
+                response = requests.get(logo1_url, timeout=5)
+                logo_img = Image.open(BytesIO(response.content)).convert("RGBA")
+                logo_img = logo_img.resize((80, 80), Image.Resampling.LANCZOS)
+                img.paste(logo_img, (110, y + 40), logo_img)
+            except Exception as e:
+                print(f"Erreur logo 1: {e}")
+                
+        # Téléchargement et insertion du Logo Équipe 2 (à droite)
+        if logo2_url:
+            try:
+                response = requests.get(logo2_url, timeout=5)
+                logo_img = Image.open(BytesIO(response.content)).convert("RGBA")
+                logo_img = logo_img.resize((80, 80), Image.Resampling.LANCZOS)
+                img.paste(logo_img, (W - 190, y + 40), logo_img)
+            except Exception as e:
+                print(f"Erreur logo 2: {e}")
+
+        # Noms des équipes & Séparateur VS
+        draw.text((210, y + 80), team_a.upper()[:15], fill="#ffffff", anchor="lm", font=font_match)
         draw.text((W/2, y + 80), "VS", fill="#00b4db", anchor="mm", font=font_match)
-        draw.text((W - 160, y + 80), team_b.upper()[:18], fill="#ffffff", anchor="rm", font=font_match)
+        draw.text((W - 210, y + 80), team_b.upper()[:15], fill="#ffffff", anchor="rm", font=font_match)
         
     output_path = "instagram_post.png"
     img.save(output_path)
-    print(f"🎨 Affiche du Round {round_number} générée avec succès : {output_path}")
+    print(f"🎨 Affiche avec logos du Round {round_number} générée avec succès : {output_path}")
 
 if __name__ == "__main__":
     asyncio.run(generate_fixtures_graphic())
