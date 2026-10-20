@@ -182,4 +182,12 @@ async def generate_fixtures_graphic():
 
         # Noms des équipes en format XXL
         text_y = y + bar_height / 2
-        draw.text
+        draw.text((margin_x + logo_size + int(65), text_y), team_a.upper()[:14], fill="#FFFFFF", anchor="lm", font=font_match)
+        draw.text((W - margin_x - logo_size - int(65), text_y), team_b.upper()[:14], fill="#FFFFFF", anchor="rm", font=font_match)
+        
+    output_path = "instagram_post.png"
+    img.save(output_path)
+    print(f"🎨 Affiche XXL corrigée générée avec succès : {output_path}")
+
+if __name__ == "__main__":
+    asyncio.run(generate_fixtures_graphic())
