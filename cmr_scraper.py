@@ -12,7 +12,7 @@ async def generate_fixtures_graphic():
     standings_url = f"{base_url}/competition/21?tab=standings"
     fixtures_url = f"{base_url}/competition/21?tab=fixtures"
     
-    print(f"🚀 [Pro Layout Fix] Récupération des logos et des matchs...")
+    print(f"🚀 [Pro Fix Taille & Style] Récupération des logos et des matchs...")
     
     team_logos = {}
     extracted_fixtures = []
@@ -104,8 +104,8 @@ async def generate_fixtures_graphic():
         img = Image.open(bg_path).convert("RGB")
         print("✅ IMG_0847.jpeg chargé avec succès !")
     else:
-        print("⚠️ IMG_0847.jpeg introuvable, création d'un fond de secours 1080x1080.")
-        img = Image.new("RGB", (1080, 1080), color="#050913")
+        print("⚠️ IMG_0847.jpeg introuvable, création d'un fond de secours 2000x2000.")
+        img = Image.new("RGB", (2000, 2000), color="#050913")
         
     W, H = img.size
     draw = ImageDraw.Draw(img)
@@ -118,82 +118,77 @@ async def generate_fixtures_graphic():
         with open(font_path, "wb") as f:
             f.write(r.content)
 
-    scale = W / 1080.0
+    # Définition de tailles fixes robustes et bien visibles peu importe la haute résolution de ton image
+    # Ajusté pour une image HD/4K (ex: 2000x2000 ou plus)
+    title_font_size = int(W * 0.045)  # Titre bien gros (~90px sur 2000px)
+    match_font_size = int(W * 0.024)  # Noms d'équipes bien lisibles (~48px sur 2000px)
+
     try:
-        font_title = ImageFont.truetype(font_path, int(64 * scale))
-        font_match = ImageFont.truetype(font_path, int(34 * scale))
-        font_vs = ImageFont.truetype(font_path, int(26 * scale))
+        font_title = ImageFont.truetype(font_path, title_font_size)
+        font_match = ImageFont.truetype(font_path, match_font_size)
     except:
         font_title = ImageFont.load_default()
         font_match = ImageFont.load_default()
-        font_vs = ImageFont.load_default()
         
-    # Titre "MATCHDAY 1"
+    # Titre "MATCHDAY 1" positionné proprement sous le logo
     title_text = "MATCHDAY 1"
-    title_y = int(H * 0.23)
-    draw.text((W/2 + int(3*scale), title_y + int(3*scale)), title_text, fill="#000000", anchor="mm", font=font_title)
+    title_y = int(H * 0.22)
+    draw.text((W/2 + 4, title_y + 4), title_text, fill="#000000", anchor="mm", font=font_title)
     draw.text((W/2, title_y), title_text, fill="#F3C653", anchor="mm", font=font_title)
     
-    # --- INSERTION DES LIGNES DE MATCHS (Correction de la boucle sur final_fixtures_with_logos) ---
-    start_y = int(H * 0.31)
-    available_height = H * 0.62
+    # --- INSERTION DES LIGNES DE MATCHS (Sans VS, grands textes, beaux logos) ---
+    start_y = int(H * 0.30)
+    available_height = H * 0.63
     row_height = int(available_height / 5)
-    bar_height = int(row_height * 0.82)
+    bar_height = int(row_height * 0.80)
     
-    margin_x = int(W * 0.07)
+    margin_x = int(W * 0.06)
     
     for i, (team_a, team_b, logo1_url, logo2_url) in enumerate(final_fixtures_with_logos):
         y = start_y + (i * row_height)
         
-        # Bandeau de match semi-transparent
-        draw.rectangle([margin_x, y, W - margin_x, y + bar_height], fill=(8, 18, 38, 230), outline=(212, 175, 55, 140), width=max(1, int(scale)))
+        # Bandeau de match semi-transparent large et propre
+        draw.rectangle([margin_x, y, W - margin_x, y + bar_height], fill=(8, 18, 38, 235), outline=(212, 175, 55, 160), width=2)
         
         # Ligne lumineuse dorée sous chaque match
-        draw.line([(margin_x + int(10*scale), y + bar_height), (W - margin_x - int(10*scale), y + bar_height)], fill="#E5B84B", width=max(2, int(2*scale)))
+        draw.line([(margin_x + 15, y + bar_height), (W - margin_x - 15, y + bar_height)], fill="#E5B84B", width=3)
         
         if logo1_url and not logo1_url.startswith("http"):
             logo1_url = base_url + logo1_url
         if logo2_url and not logo2_url.startswith("http"):
             logo2_url = base_url + logo2_url
 
-        logo_size = int(bar_height * 0.7)
+        logo_size = int(bar_height * 0.72)
         logo_y = y + (bar_height - logo_size) // 2
 
-        # Insertion Logo Équipe 1
+        # Insertion Logo Équipe 1 (À gauche)
         if logo1_url:
             try:
                 response = requests.get(logo1_url, timeout=5)
                 logo_img = Image.open(BytesIO(response.content)).convert("RGBA")
                 logo_img = logo_img.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
-                img.paste(logo_img, (margin_x + int(25*scale), logo_y), logo_img)
+                img.paste(logo_img, (margin_x + int(35), logo_y), logo_img)
             except Exception as e:
                 print(f"Erreur logo 1: {e}")
                 
-        # Insertion Logo Équipe 2
+        # Insertion Logo Équipe 2 (À droite)
         if logo2_url:
             try:
                 response = requests.get(logo2_url, timeout=5)
                 logo_img = Image.open(BytesIO(response.content)).convert("RGBA")
                 logo_img = logo_img.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
-                img.paste(logo_img, (W - margin_x - int(25*scale) - logo_size, logo_y), logo_img)
+                img.paste(logo_img, (W - margin_x - int(35) - logo_size, logo_y), logo_img)
             except Exception as e:
                 print(f"Erreur logo 2: {e}")
 
-        # Badge "VS" central en cyan néon
-        vs_w, vs_h = int(52 * scale), int(32 * scale)
-        vs_x = W // 2 - vs_w // 2
-        vs_y = y + (bar_height - vs_h) // 2
-        draw.rectangle([vs_x, vs_y, vs_x + vs_w, vs_y + vs_h], fill="#03060A", outline="#00B4DB", width=max(1, int(scale)))
-        draw.text((W/2, y + bar_height/2), "VS", fill="#00B4DB", anchor="mm", font=font_vs)
-
-        # Noms des équipes
+        # Noms des équipes (Bien visibles, ancrés à gauche et à droite, plus de "VS")
         text_y = y + bar_height / 2
-        draw.text((margin_x + int(105*scale), text_y), team_a.upper()[:14], fill="#FFFFFF", anchor="lm", font=font_match)
-        draw.text((W - margin_x - int(105*scale), text_y), team_b.upper()[:14], fill="#FFFFFF", anchor="rm", font=font_match)
+        draw.text((margin_x + logo_size + int(55), text_y), team_a.upper()[:16], fill="#FFFFFF", anchor="lm", font=font_match)
+        draw.text((W - margin_x - logo_size - int(55), text_y), team_b.upper()[:16], fill="#FFFFFF", anchor="rm", font=font_match)
         
     output_path = "instagram_post.png"
     img.save(output_path)
-    print(f"🎨 Affiche dynamique et proportionnelle générée avec succès : {output_path}")
+    print(f"🎨 Affiche propre sans VS et texte visible générée avec succès : {output_path}")
 
 if __name__ == "__main__":
     asyncio.run(generate_fixtures_graphic())
